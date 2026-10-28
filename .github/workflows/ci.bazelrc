@@ -17,6 +17,8 @@ common:buildbuddy --noexperimental_remote_cache_chunking
 common:buildbuddy-rbe --config=buildbuddy
 common:buildbuddy-rbe --config=rbe
 common:buildbuddy-rbe --jobs=100
+build:buildbuddy-rbe --remote_download_outputs=toplevel
+test:buildbuddy-rbe --remote_download_outputs=minimal
 
 # Hosted runners are small; use every core (.bazelrc leaves two free).
 build --local_resources=cpu=HOST_CPUS
