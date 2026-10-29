@@ -104,6 +104,12 @@ tarball (author `dnf5-prebuilt`), listed in `DNF5_PATCHES` in
 `bazel/extensions.bzl`. Workflow: extract the tarball into a scratch git repo,
 commit it, apply the patches, commit fixes, `git format-patch <base>`.
 
+## Command plugins
+
+`bazel/dnf5/plugins/` keeps upstream dnf5's C++ style: its `.clang-format` is upstream's, and CI checks it
+with upstream's pinned clang-format. Format with
+`pipx run --spec clang-format==19.1.0 clang-format -i bazel/dnf5/plugins/*.cpp bazel/dnf5/plugins/*.hpp`.
+
 ## Verifying changes
 
 ```sh
