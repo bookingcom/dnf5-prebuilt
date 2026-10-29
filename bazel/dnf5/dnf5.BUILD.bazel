@@ -438,6 +438,35 @@ DNF5_PLUGINS = {
     for name, (directory, domain, extra_deps) in DNF5_PLUGINS.items()
 ]
 
+# Command plugins of this repository, not of upstream (sources in
+# //bazel/dnf5/plugins), built like the upstream ones above.
+# name -> (sources, gettext domain, extra deps)
+LOCAL_DNF5_PLUGINS = {
+    "rpmdb-mark_cmd_plugin": (
+        "@dnf5-prebuilt//bazel/dnf5/plugins:rpmdb_mark",
+        "dnf5-plugin-rpmdb-mark",
+        ["@rpm"],
+    ),
+}
+
+[
+    cc_library(
+        name = name + "_obj",
+        srcs = [srcs],
+        copts = COPTS + INC_DNF5_PLUGIN,
+        cxxopts = CXXOPTS,
+        local_defines = DEFINES + ['GETTEXT_DOMAIN=\\"%s\\"' % domain],
+        visibility = ["//visibility:private"],
+        deps = [
+            ":common_plugins",
+            ":headers",
+            ":libdnf5_cli_obj",
+            ":libdnf5_obj",
+        ] + extra_deps,
+    )
+    for name, (srcs, domain, extra_deps) in LOCAL_DNF5_PLUGINS.items()
+]
+
 [
     cc_shared_library(
         name = name,
@@ -450,7 +479,7 @@ DNF5_PLUGINS = {
         user_link_flags = DNF5_PLUGIN_LINKOPTS + RPATH_PLUGIN,
         deps = [name + "_obj"],
     )
-    for name in DNF5_PLUGINS
+    for name in DNF5_PLUGINS.keys() + LOCAL_DNF5_PLUGINS.keys()
 ]
 
 # name -> (source, gettext domain, output name, extra deps)
