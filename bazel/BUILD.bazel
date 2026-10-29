@@ -5,7 +5,7 @@ load("@platforms_contrib//os/linux/libc/glibc:glibc.bzl", "glibc_version_constra
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["extensions.bzl"])
+exports_files(["extensions.bzl"] + glob(["patches/**"]))
 
 # Target platforms. Linux targets build against glibc 2.28 headers/stubs
 # (RHEL 8 and newer) via the hermetic LLVM toolchain.

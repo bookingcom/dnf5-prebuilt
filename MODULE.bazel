@@ -16,6 +16,11 @@ bazel_dep(name = "tar.bzl", version = "0.10.9", dev_dependency = True)
 
 # Hermetic LLVM C/C++ toolchain from BCR
 bazel_dep(name = "llvm", version = "0.8.26", dev_dependency = True)
+single_version_override(
+    module_name = "llvm",
+    patch_strip = 1,
+    patches = ["//bazel:patches/llvm-exclude-fontparser.patch"],
+)
 
 register_toolchains(
     "@llvm//toolchain:all",

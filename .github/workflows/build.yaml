@@ -18,7 +18,6 @@ jobs:
       # invocation links at https://<host>/invocation/).
       BUILDBUDDY_ENDPOINT: ${{ vars.BUILDBUDDY_ENDPOINT }}
       BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      PLATFORMS: linux_amd64 linux_arm64 osx_amd64 osx_arm64
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.15.0
@@ -43,16 +42,9 @@ jobs:
           --config=linux_amd64 -c opt //bazel/tests/...
       - name: Build
         run: |
-          version=$(sed -n 's/^DNF5_VERSION = "\(.*\)"/\1/p' bazel/extensions.bzl)
           mkdir -p dist
-          for platform in $PLATFORMS; do
-            echo "::group::${platform}"
-            bazel --bazelrc=.github/workflows/ci.bazelrc build \
-              --config="${platform}" -c opt //bazel/release:dnf5 //bazel/tests/...
-            # bazel-bin points at the configuration of the last build.
-            cp -L bazel-bin/bazel/release/dnf5.tar.gz "dist/dnf5-${version}-${platform}.tar.gz"
-            echo "::endgroup::"
-          done
+          bazel --bazelrc=.github/workflows/ci.bazelrc build -c opt //bazel/release:dist
+          cp -L bazel-bin/bazel/release/dnf5-*.tar.gz dist/
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:

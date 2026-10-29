@@ -1,0 +1,11 @@
+--- a/extensions/osx.bzl
++++ b/extensions/osx.bzl
+@@ -206,6 +206,8 @@ def _osx_extension_impl(mctx):
+         "usr/lib/libnet*",
+         "usr/lib/libtcl*",
+         "usr/lib/libtk*",
++        "System/Library/Frameworks/**/libFontParser.tbd",
++        "System/Library/Frameworks/**/libType1Scaler.tbd",
+     ]
+ 
+     if "IOKit" not in frameworks:

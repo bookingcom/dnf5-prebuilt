@@ -1,4 +1,5 @@
-load(":dist.bzl", "dnf5_distribution")
+load("//bazel:extensions.bzl", "DNF5_VERSION")
+load(":dist.bzl", "dnf5_distribution", "dnf5_multiplatform_distribution")
 
 # Relocatable dnf5 distribution for the target platform:
 #
@@ -68,5 +69,14 @@ dnf5_distribution(
     ],
     prefix = "dnf5",
     renames = {"dnf5.sh": "dnf5"},
+    visibility = ["//visibility:public"],
+)
+
+# Cross-compiles the dnf5 distribution archives for all 4 supported platforms
+# (linux_amd64, linux_arm64, osx_amd64, osx_arm64) using transitions.
+dnf5_multiplatform_distribution(
+    name = "dist",
+    target = ":dnf5",
+    version = DNF5_VERSION,
     visibility = ["//visibility:public"],
 )

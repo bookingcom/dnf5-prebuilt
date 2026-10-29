@@ -104,3 +104,71 @@ def dnf5_distribution(name, srcs, prefix, executables = [], renames = {}, **kwar
         out = name + ".tar.gz",
         **kwargs
     )
+
+_PLATFORM_CONFIGS = {
+    "linux_amd64": {
+        "//command_line_option:platforms": ["//bazel:linux_amd64"],
+        "@openssl//:use-no-asm-fallback": False,
+    },
+    "linux_arm64": {
+        "//command_line_option:platforms": ["//bazel:linux_arm64"],
+        "@openssl//:use-no-asm-fallback": True,
+    },
+    "osx_amd64": {
+        "//command_line_option:platforms": ["//bazel:osx_amd64"],
+        "@openssl//:use-no-asm-fallback": False,
+    },
+    "osx_arm64": {
+        "//command_line_option:platforms": ["//bazel:osx_arm64"],
+        "@openssl//:use-no-asm-fallback": False,
+    },
+}
+
+def _multiplatform_transition_impl(_settings, _attr):
+    return {
+        platform: {
+            "//command_line_option:platforms": cfg["//command_line_option:platforms"],
+            "@openssl//:use-no-asm-fallback": cfg["@openssl//:use-no-asm-fallback"],
+        }
+        for platform, cfg in _PLATFORM_CONFIGS.items()
+    }
+
+_multiplatform_transition = transition(
+    implementation = _multiplatform_transition_impl,
+    inputs = [],
+    outputs = [
+        "//command_line_option:platforms",
+        "@openssl//:use-no-asm-fallback",
+    ],
+)
+
+def _dnf5_multiplatform_distribution_impl(ctx):
+    out_files = []
+    output_groups = {}
+    for platform, target in ctx.split_attr.target.items():
+        src_file = target[DefaultInfo].files.to_list()[0]
+        out_file = ctx.actions.declare_file("dnf5-%s-%s.tar.gz" % (ctx.attr.version, platform))
+        ctx.actions.symlink(output = out_file, target_file = src_file)
+        out_files.append(out_file)
+        output_groups[platform] = depset([out_file])
+
+    return [
+        DefaultInfo(files = depset(out_files)),
+        OutputGroupInfo(**output_groups),
+    ]
+
+dnf5_multiplatform_distribution = rule(
+    implementation = _dnf5_multiplatform_distribution_impl,
+    attrs = {
+        "target": attr.label(
+            cfg = _multiplatform_transition,
+            mandatory = True,
+        ),
+        "version": attr.string(
+            mandatory = True,
+        ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
+    },
+)
