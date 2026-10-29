@@ -1,0 +1,13 @@
+diff --git a/bazel/rpmconfig/rpmrc b/bazel/rpmconfig/rpmrc
+--- a/bazel/rpmconfig/rpmrc
++++ b/bazel/rpmconfig/rpmrc
+@@ -601,7 +601,8 @@
+ os_compat: BSD_OS: bsdi
+ os_compat: bsdi4.0: bsdi
+ 
+-os_compat: Darwin: MacOSX
++# rpm takes the host OS from uname: a macOS host installs Linux packages too.
++os_compat: Darwin: MacOSX linux
+ 
+ buildarch_compat: ia64: noarch
+ 

@@ -1,0 +1,30 @@
+diff --git a/rpmio/rpmstrpool.cc b/rpmio/rpmstrpool.cc
+--- a/rpmio/rpmstrpool.cc
++++ b/rpmio/rpmstrpool.cc
+@@ -3,6 +3,7 @@
+ #include <shared_mutex>
+ #include <mutex>
+ #include <atomic>
++#include <new>
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -238,6 +239,10 @@
+ rpmstrPool rpmstrPoolCreate(void)
+ {
+     rpmstrPool pool = (rpmstrPool)xcalloc(1, sizeof(*pool));
++    /* calloc() does not construct the mutex: all-zero bytes are an unlocked
++     * mutex with glibc, but not with macOS, whose pthread objects carry a
++     * signature (pthread_mutex_lock() fails with EINVAL). */
++    new (&pool->mutex) std::shared_mutex();
+ 
+     pool->offs_alloced = STROFFS_CHUNK;
+     pool->offs = (const char **)xcalloc(pool->offs_alloced, sizeof(*pool->offs));
+@@ -267,6 +272,7 @@
+ 	pool->chunks[i] = _free(pool->chunks[i]);
+     }
+     free(pool->chunks);
++    pool->mutex.~shared_mutex();
+     free(pool);
+ 
+     return NULL;

@@ -13,7 +13,9 @@
   ],
   "exclude_targets": [
     "automatic_cmd_plugin",
-    "needs_restarting_cmd_plugin"
+    "needs_restarting_cmd_plugin",
+    "lock_cmd_plugin",
+    "rpmdb-mark_cmd_plugin"
   ],
   "target_map": {
     "dnf5": "@@+dnf5_extension+dnf5//:dnf5"
@@ -97,7 +99,7 @@
     ]
   },
   "_rationale": {
-    "exclude_targets": "automatic and needs-restarting need sdbus-c++/systemd, which are out of scope for a portable build; they are configured in the reference only because they cannot be switched off.",
+    "exclude_targets": "automatic and needs-restarting need sdbus-c++/systemd, which are out of scope for a portable build; they are configured in the reference only because they cannot be switched off. lock and rpmdb-mark are command plugins of this repository (//bazel/dnf5/plugins), not of upstream, so the CMake reference has no counterpart. Their sources live in the main repository, outside @dnf5, so the diff attributes them to no target and reports them as 5 extra_tu warnings.",
     "target_map": "Bazel keys targets by label; @dnf5 is created by the dnf5_extension module extension.",
     "dep_map.dnf5-cli": "libdnf5-cli is linked as a shared library on both sides; CMake spells it as a library name, Bazel as -l:libdnf5-cli.so.3.",
     "dep_map.stdc++": "Upstream links libstdc++ explicitly (for clang); the hermetic LLVM toolchain uses libc++ on every platform.",
