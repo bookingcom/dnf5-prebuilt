@@ -23,6 +23,8 @@ DNF5_PLUGINS = [
     "repoclosure_cmd_plugin",
     "repomanage_cmd_plugin",
     "reposync_cmd_plugin",
+    # //bazel/dnf5/plugins
+    "rpmdb-mark_cmd_plugin",
 ]
 
 LIBDNF5_PLUGINS = [
