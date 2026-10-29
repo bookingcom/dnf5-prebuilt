@@ -2,6 +2,7 @@
 # the upstream plugins (LOCAL_DNF5_PLUGINS in dnf5.BUILD.bazel) and the
 # distribution installs them in lib/dnf5/plugins/.
 #
+#   lock         resolves packages into a JSON lockfile (rpm_lock)
 #   rpmdb-mark   records packages in an rpmdb without installing them (rpm_mark)
 
 # What both plugins share: CommandPlugin and the entry points, and the
@@ -10,6 +11,18 @@ COMMON = [
     "arguments.hpp",
     "command_plugin.hpp",
 ]
+
+filegroup(
+    name = "lock",
+    srcs = COMMON + [
+        "lock.cpp",
+        "lock.hpp",
+        "lock_cmd_plugin.cpp",
+        "lock_layers.cpp",
+        "lock_layers.hpp",
+    ],
+    visibility = ["@dnf5//:__pkg__"],
+)
 
 filegroup(
     name = "rpmdb_mark",
