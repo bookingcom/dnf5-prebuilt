@@ -128,12 +128,15 @@ bazel_dep(name = "rpm-sequoia", version = "1.10.3", dev_dependency = True)
 
 # rpm on a macOS host: its string pool is calloc()ed without constructing the
 # std::shared_mutex, which fails every transaction with "mutex lock failed",
-# and rpmrc needs os_compat Darwin: linux to accept Linux packages.
+# and rpmrc needs os_compat Darwin: linux to accept Linux packages. On every
+# host, sqlite_init leaks the sqlite handle when the rpmdb cannot be opened
+# (LSan fails dnf5 run as a build action by a non-root user).
 single_version_override(
     module_name = "rpm",
     patch_strip = 1,
     patches = [
         "//bazel:patches/rpm-rpmrc-darwin-linux.patch",
+        "//bazel:patches/rpm-sqlite-close-on-open-failure.patch",
         "//bazel:patches/rpm-strpool-construct-mutex.patch",
     ],
 )
