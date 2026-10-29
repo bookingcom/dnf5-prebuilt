@@ -1,0 +1,39 @@
+# Bazel on a hosted runner, with the BuildBuddy remote cache and execution when
+# both the endpoint and the API key are set (otherwise the GitHub Actions disk
+# cache). Used by build.yaml and ci.yaml.
+name: Set up Bazel
+description: Installs Bazel and configures the optional BuildBuddy remote cache.
+
+inputs:
+  buildbuddy-endpoint:
+    description: BuildBuddy host name (gRPC at grpcs://<host>, invocation links at https://<host>/invocation/).
+    required: false
+    default: ""
+  buildbuddy-api-key:
+    description: API key for that BuildBuddy.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: bazel-contrib/setup-bazel@0.15.0
+      with:
+        bazelisk-cache: true
+        repository-cache: true
+        disk-cache: ${{ inputs.buildbuddy-endpoint == '' || inputs.buildbuddy-api-key == '' }}
+    - name: Configure remote cache
+      if: inputs.buildbuddy-endpoint != '' && inputs.buildbuddy-api-key != ''
+      shell: bash
+      env:
+        BUILDBUDDY_ENDPOINT: ${{ inputs.buildbuddy-endpoint }}
+        BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy-api-key }}
+      run: |
+        {
+          echo "common --config=buildbuddy-rbe"
+          echo "common:buildbuddy --bes_backend=grpcs://${BUILDBUDDY_ENDPOINT}"
+          echo "common:buildbuddy --bes_results_url=https://${BUILDBUDDY_ENDPOINT}/invocation/"
+          echo "common:buildbuddy --remote_cache=grpcs://${BUILDBUDDY_ENDPOINT}"
+          echo "common:buildbuddy-rbe --remote_executor=grpcs://${BUILDBUDDY_ENDPOINT}"
+          echo "common:buildbuddy --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+        } > .bazelrc.user
