@@ -1,10 +1,15 @@
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
+# The dnf5 launcher of the registered toolchain, with the distribution as runfiles.
+DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
+
+DNF5_ROOTPATH = "$(rootpath %s)" % DNF5
+
 sh_test(
     name = "smoke_test",
     srcs = ["smoke_test.sh"],
-    data = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
-    env = {"DNF5": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:current_toolchain)"},
+    data = [DNF5],
+    env = {"DNF5": DNF5_ROOTPATH},
 )
 
 # The README example: $(DNF5) in a genrule.
@@ -12,8 +17,8 @@ genrule(
     name = "dnf5_version",
     outs = ["dnf5_version.txt"],
     cmd = "$(DNF5) --version > $@",
-    toolchains = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
-    tools = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
+    toolchains = [DNF5],
+    tools = [DNF5],
 )
 
 sh_test(
