@@ -20,9 +20,18 @@ jobs:
 
   e2e:
     # Runs e2e/smoke_test, which consumes the public API (dnf5-prebuilt/) like
-    # a user would, against the linux_amd64 archive built above.
+    # a user would, against the archives built above on Linux and macOS.
+    name: e2e (${{ matrix.platform }})
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-amd64
+          - os: macos-15
+            platform: darwin-arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
