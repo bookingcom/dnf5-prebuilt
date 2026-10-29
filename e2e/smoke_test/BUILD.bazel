@@ -1,5 +1,10 @@
 load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_mark")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(":lock_golden.bzl", "lock_golden")
+
+# //testdata:lock_golden diffs the normalized lockfiles of this package.
+package(default_visibility = ["//testdata:__pkg__"])
 
 # The dnf5 launcher of the registered toolchain, with the distribution as runfiles.
 DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
@@ -102,6 +107,199 @@ sh_test(
         ":dnf5_test_lib",
         ":ol9_dnf_config",
         DNF5,
+    ],
+)
+
+# Replaces the sandbox paths of a lockfile (see lock_golden.bzl and normalize_lock.sh).
+sh_binary(
+    name = "normalize_lock",
+    srcs = ["normalize_lock.sh"],
+)
+
+# Step 2 test: Lockfile generation with RPM exclusion
+lock_golden(
+    name = "test_generated_lock",
+    out = "test_generated_lock.lock.json",
+    exclude = ["mystery-devel"],
+    packages = ["tour"],
+    repo_config = "//testdata:test.repo",
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+sh_test(
+    name = "rpm_lock_test",
+    srcs = ["test_lock.sh"],
+    args = [
+        "$(rootpath :test_generated_lock.lock.json)",
+    ],
+    data = [
+        ":test_generated_lock.lock.json",
+    ],
+)
+
+sh_test(
+    name = "lock_run_test",
+    srcs = ["test_lock_run.sh"],
+    args = [
+        "test_generated_lock_run.sh",
+        "$(rootpath :test_generated_lock.lock.json)",
+        "test_generated_lock.lock.json",
+    ],
+    data = [
+        ":test_generated_lock",
+        ":test_generated_lock.lock.json",
+    ],
+)
+
+# Incremental lockfile tests
+lock_golden(
+    name = "layer2_already_installed_lock",
+    out = "layer2_already_installed.lock.json",
+    lock_files = [":test_generated_lock.lock.json"],
+    packages = ["tour"],
+    repo_config = "//testdata:test.repo",
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+lock_golden(
+    name = "layer2_incremental_lock",
+    out = "layer2_incremental.lock.json",
+    lock_files = [":test_generated_lock.lock.json"],
+    packages = ["mystery-devel"],
+    repo_config = "//testdata:test.repo",
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+lock_golden(
+    name = "layer2_both_lock",
+    out = "layer2_both.lock.json",
+    lock_files = [":test_generated_lock.lock.json"],
+    packages = [
+        "mystery-devel",
+        "tour",
+    ],
+    repo_config = "//testdata:test.repo",
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+lock_golden(
+    name = "changed_integrity_lock",
+    out = "changed_integrity.lock.json",
+    lock_files = ["//testdata:changed_integrity.lock.json"],
+    packages = ["tour"],
+    repo_config = "//testdata:test.repo",
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+sh_test(
+    name = "incremental_lock_test",
+    srcs = ["test_incremental_lock.sh"],
+    args = [
+        "$(rootpath :layer2_already_installed.lock.json)",
+        "$(rootpath :layer2_incremental.lock.json)",
+        "$(rootpath :layer2_both.lock.json)",
+        "$(rootpath :changed_integrity.lock.json)",
+    ],
+    data = [
+        ":changed_integrity.lock.json",
+        ":layer2_already_installed.lock.json",
+        ":layer2_both.lock.json",
+        ":layer2_incremental.lock.json",
+    ],
+)
+
+# The same options through the rpm_lock attributes (golden lockfiles in //testdata)
+lock_golden(
+    name = "attrs_excludepkgs_lock",
+    out = "attrs_excludepkgs.lock.json",
+    excludepkgs = ["ca-certificates-2026.2.92_v9.0.319-*"],
+    packages = ["certuser"],
+    repo_config = "//testdata:features.repo",
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+lock_golden(
+    name = "attrs_nobest_lock",
+    out = "attrs_nobest.lock.json",
+    nobest = True,
+    packages = ["bestapp"],
+    repo_config = "//testdata:features.repo",
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+lock_golden(
+    name = "attrs_noweak_lock",
+    out = "attrs_noweak.lock.json",
+    install_weak_deps = False,
+    packages = ["weakapp"],
+    repo_config = "//testdata:features.repo",
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+lock_golden(
+    name = "attrs_module_lock",
+    out = "attrs_module.lock.json",
+    module_enable = ["mysql:8.4"],
+    module_platform_id = "platform:el9",
+    packages = ["mysql"],
+    repo_config = "//testdata:features.repo",
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+lock_golden(
+    name = "attrs_forcearch_lock",
+    out = "attrs_forcearch.lock.json",
+    forcearch = "x86_64",
+    packages = ["expat"],
+    repo_config = "//testdata:features.repo",
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+sh_test(
+    name = "lock_attrs_test",
+    srcs = ["test_lock_attrs.sh"],
+    args = [
+        "$(rootpath :attrs_excludepkgs.lock.json)",
+        "$(rootpath :attrs_nobest.lock.json)",
+        "$(rootpath :attrs_module.lock.json)",
+        "$(rootpath :attrs_forcearch.lock.json)",
+        "$(rootpath :attrs_noweak.lock.json)",
+    ],
+    data = [
+        ":attrs_excludepkgs.lock.json",
+        ":attrs_forcearch.lock.json",
+        ":attrs_module.lock.json",
+        ":attrs_nobest.lock.json",
+        ":attrs_noweak.lock.json",
+    ],
+)
+
+dnf_config(
+    name = "test_dnf_config",
+    releasever = "9",
+    repo_configs = ["//testdata:test.repo"],
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+# `dnf5 lock` run directly, under the preamble of a dnf_config.
+sh_test(
+    name = "lock_direct_test",
+    srcs = ["test_lock_direct.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath //testdata:test.repo)",
+        "$(rootpath //testdata:repo/repodata/repomd.xml)",
+        "$(rootpath :test_generated_lock.lock.json)",
+        "$(rootpath :test_dnf_config)",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":test_dnf_config",
+        ":test_generated_lock.lock.json",
+        DNF5,
+        "//testdata:repo/repodata/repomd.xml",
+        "//testdata:test.repo",
+        "//testdata:test_repo_files",
     ],
 )
 
