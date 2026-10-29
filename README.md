@@ -188,6 +188,12 @@ mkdir -p /tmp/dist && cp -L bazel-bin/bazel/release/dnf5.tar.gz /tmp/dist/dnf5-5
 (cd e2e/smoke_test && bazel test //... --repo_env=DNF5_PREBUILT_DIST_DIR=/tmp/dist)
 ```
 
+`--config=asan` builds dnf5 and every C/C++ dependency with ASan, LSan and
+UBSan. The `sanitizers` job in `.github/workflows/ci.yaml` builds the
+linux_amd64 archive this way and runs `e2e/smoke_test` against it with the
+sanitizer options. Fix findings in our code. Suppress third-party noise in
+`sanitizers/*.supp`, with a reason for each entry.
+
 `--config=rbe` enables remote execution (configure the endpoint and
 credentials in `.bazelrc.user`, which is git-ignored). Remote actions run in
 the Ubuntu 24.04 image of toolchains_buildbuddy; use another image with
