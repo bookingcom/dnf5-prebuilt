@@ -208,6 +208,33 @@ sh_test(
     ],
 )
 
+dnf_config(
+    name = "features_dnf_config",
+    module_platform_id = "platform:el9",
+    releasever = "9",
+    repo_configs = ["//testdata:features.repo"],
+    repo_files = ["//testdata:features_repo_files"],
+)
+
+# `dnf5 lock` options: excludepkgs, module enable, best/nobest, forcearch, duplicate repos, weak deps.
+sh_test(
+    name = "lock_features_test",
+    srcs = ["test_lock_features.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath //testdata:features-repo/repodata/repomd.xml)",
+        "$(rootpath :features_dnf_config)",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":features_dnf_config",
+        DNF5,
+        "//testdata:features-repo/repodata/repomd.xml",
+        "//testdata:features_repo_files",
+    ],
+    shard_count = 6,
+)
+
 # The same options through the rpm_lock attributes (golden lockfiles in //testdata)
 lock_golden(
     name = "attrs_excludepkgs_lock",
@@ -300,6 +327,22 @@ sh_test(
         "//testdata:repo/repodata/repomd.xml",
         "//testdata:test.repo",
         "//testdata:test_repo_files",
+    ],
+)
+
+# `dnf5 lock --lockfile` on small metadata-only repositories.
+sh_test(
+    name = "lock_layers_test",
+    srcs = ["test_lock_layers.sh"],
+    args = [
+        "$(rootpath :test_lock_layers.py)",
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+    ],
+    data = [
+        ":ol9_dnf_config",
+        ":test_lock_layers.py",
+        DNF5,
     ],
 )
 
