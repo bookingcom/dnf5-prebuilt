@@ -1,7 +1,7 @@
 bcr_test_module:
   module_path: "e2e/smoke_test"
   matrix:
-    bazel: ["7.x", "8.x", "9.x"]
+    bazel: ["8.x", "9.x"]
     platform: ["debian11", "ubuntu2204", "ubuntu2404", "ubuntu2204_arm64", "macos", "macos_arm64"]
   tasks:
     run_test_module:
