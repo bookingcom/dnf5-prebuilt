@@ -39,18 +39,28 @@ jobs:
           path: dist
       - name: Prepare release
         run: .github/workflows/release_prep.sh "$TAG" dist >release_notes.md
-      - uses: actions/attest-build-provenance@v2
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             dist/*.tar.gz
             dnf5-prebuilt-*.tar.gz
+      - name: Generate attestation assets
+        run: |
+          cat "${{ steps.attest.outputs.bundle-path }}" | jq --compact-output > "dnf5-prebuilt-${TAG}.tar.gz.intoto.jsonl"
+          for f in dist/*.tar.gz; do
+            cat "${{ steps.attest.outputs.bundle-path }}" | jq --compact-output > "${f}.intoto.jsonl"
+          done
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           body_path: release_notes.md
           files: |
             dist/*.tar.gz
+            dist/*.intoto.jsonl
             dnf5-prebuilt-*.tar.gz
+            dnf5-prebuilt-*.tar.gz.intoto.jsonl
           fail_on_unmatched_files: true
 
   publish:
