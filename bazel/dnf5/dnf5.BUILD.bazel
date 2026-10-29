@@ -442,6 +442,14 @@ DNF5_PLUGINS = {
 # //bazel/dnf5/plugins), built like the upstream ones above.
 # name -> (sources, gettext domain, extra deps)
 LOCAL_DNF5_PLUGINS = {
+    "lock_cmd_plugin": (
+        "@dnf5-prebuilt//bazel/dnf5/plugins:lock",
+        "dnf5-plugin-lock",
+        [
+            "@glib//glib",
+            "@json-c",
+        ],
+    ),
     "rpmdb-mark_cmd_plugin": (
         "@dnf5-prebuilt//bazel/dnf5/plugins:rpmdb_mark",
         "dnf5-plugin-rpmdb-mark",
