@@ -1,3 +1,4 @@
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_mark")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 # The dnf5 launcher of the registered toolchain, with the distribution as runfiles.
@@ -33,4 +34,103 @@ sh_test(
     srcs = ["genrule_test.sh"],
     data = [":dnf5_version"],
     env = {"VERSION_FILE": "$(rootpath :dnf5_version)"},
+)
+
+# --- The rules: dnf_config, rpm_lock and rpm_mark ----------------------------
+
+# dnf5 smoke: repo load, repoquery and a solver run against the Oracle Linux 9 test repository
+sh_test(
+    name = "dnf5_smoke_test",
+    srcs = ["test_dnf5.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "testdata/ol9_repo",
+        "testdata/repo/tour-4-6.noarch.rpm",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        DNF5,
+        "//testdata:ol9_repo_files",
+        "//testdata:test_repo_files",
+    ],
+)
+
+# dnf_config renders dnf.conf and the .repo file; the preamble makes dnf5 read only those.
+dnf_config(
+    name = "ol9_dnf_config",
+    excludepkgs = ["mystery-devel"],
+    install_weak_deps = False,
+    module_platform_id = "platform:el9",
+    releasever = "9",
+    repo_configs = ["//testdata:ol9_repo/ol9.repo"],
+    repo_files = ["//testdata:ol9_repo_files"],
+)
+
+filegroup(
+    name = "dnf5_test_lib",
+    srcs = ["dnf5_lib.sh"],
+)
+
+sh_test(
+    name = "dnf5_config_smoke_test",
+    srcs = ["test_dnf5_config.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        DNF5,
+    ],
+)
+
+# dnf5's effective configuration under the preamble holds no host path and equals the golden file.
+# To update it, copy dnf5_config_golden.txt from the test's undeclared outputs (bazel-testlogs/.../test.outputs).
+sh_test(
+    name = "dnf5_config_golden_test",
+    srcs = ["test_dnf5_config_golden.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+        "$(rootpath dnf5_config_golden.txt)",
+    ],
+    data = [
+        "dnf5_config_golden.txt",
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        DNF5,
+    ],
+)
+
+rpm_mark(
+    name = "ol9_marked_rpmdb",
+    arch = "x86_64",
+    packages = [
+        "curl=7.76.1-40.el9_8.8",
+    ],
+    releasever = "9",
+    repo_config = "//testdata:ol9_repo/ol9.repo",
+    repo_files = ["//testdata:ol9_repo_files"],
+)
+
+# rpm_mark and the standalone `dnf5 rpmdb-mark`: the rpmdb holds exactly curl and libcurl.
+sh_test(
+    name = "rpm_mark_test",
+    srcs = ["test_rpm_mark.sh"],
+    args = [
+        "$(rootpath :ol9_marked_rpmdb)",
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        ":ol9_marked_rpmdb",
+        DNF5,
+        "//testdata:ol9_repo_files",
+    ],
 )
