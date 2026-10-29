@@ -16,3 +16,4 @@ release_assets/
 !*.patch
 /e2e/*/bazel-*
 /e2e/*/MODULE.bazel.lock
+__pycache__/
