@@ -11,6 +11,8 @@ load(
     _DNF5_PREAMBLE = "DNF5_PREAMBLE",
     _dnf_config = "dnf_config",
 )
+load("//dnf5-prebuilt/private:lock.bzl", _rpm_lock = "rpm_lock")
+load("//dnf5-prebuilt/private:mark.bzl", _rpm_mark = "rpm_mark")
 load(
     "//dnf5-prebuilt/private:providers.bzl",
     _DnfConfigInfo = "DnfConfigInfo",
@@ -26,3 +28,5 @@ DNF5_PREAMBLE = _DNF5_PREAMBLE
 DnfConfigInfo = _DnfConfigInfo
 RpmLockFileInfo = _RpmLockFileInfo
 dnf_config = _dnf_config
+rpm_lock = _rpm_lock
+rpm_mark = _rpm_mark

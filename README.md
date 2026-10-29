@@ -8,7 +8,9 @@ filesystem from a build).
 
 - dnf5 **5.4.6.0** with libdnf5, libdnf5-cli and the dnf5/libdnf5 plugins
   (builddep, changelog, config-manager, copr, manifest, repoclosure,
-  repomanage, reposync, actions, expired-pgp-keys, local).
+  repomanage, reposync, actions, expired-pgp-keys, local), plus two command
+  plugins of this repository: `lock` (resolves packages into a JSON lockfile)
+  and `rpmdb-mark` (records packages in an rpmdb without installing them).
 - Every dependency (rpm 6.1 with Sequoia OpenPGP, libsolv, librepo, curl,
   OpenSSL, glib, libmodulemd, …) is built from source with a hermetic LLVM
   toolchain; nothing is taken from the build host.
@@ -69,6 +71,54 @@ genrule(
 `dnf5.toolchains(name = "...", version = "...")` selects another name for the
 generated repositories (`<name>_toolchains`, `<name>_<platform>`) or another
 published dnf5 version.
+
+### Rules: `rpm_lock`, `rpm_mark`, `dnf_config`
+
+`@dnf5-prebuilt//dnf5-prebuilt:defs.bzl` also has rules that run the
+registered toolchain's dnf5 hermetically: every dnf5 directory (cache, logs,
+state, variables, plugin configuration) points into the action's scratch
+directory or the generated configuration, never at the host's `/etc`, `/var`
+or `$HOME`.
+
+```starlark
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_lock", "rpm_mark")
+
+# Resolves the packages with `dnf5 lock` into base_lock.lock.json.
+rpm_lock(
+    name = "base_lock",
+    arch = ["x86_64", "noarch"],
+    packages = ["bash"],
+    releasever = "9",
+    repo_config = "ol9.repo",
+)
+
+# Records the packages with `dnf5 rpmdb-mark` in var/lib/rpm/rpmdb.sqlite,
+# without installing them.
+rpm_mark(
+    name = "base_rpmdb",
+    arch = "x86_64",
+    packages = ["curl"],
+    releasever = "9",
+    repo_config = "ol9.repo",
+)
+```
+
+- `rpm_lock` writes a JSON lockfile with, per package, `name`, `version`,
+  `arch`, `nevra`, `url`, the SRI `integrity`, `checksum` and `dependencies`
+  (plus `recommends`/`supplements` when the package has any) and provides
+  `RpmLockFileInfo`. `lock_files` solves a layer on top of earlier lockfiles,
+  `exclude` prunes packages from the result (`dnf5 lock --prune`), and
+  `excludepkgs`, `forcearch`, `install_weak_deps`, `module_enable`,
+  `module_platform_id` and `nobest` map to the dnf options of the same name.
+  `bazel run` of an `rpm_lock` target writes the lockfile into the source tree.
+- `dnf_config` renders the configuration on its own (`DnfConfigInfo`) for
+  custom rules; `DNF5_PREAMBLE` is the list of dnf5 options they run under.
+- `dnf5 lock` and `dnf5 rpmdb-mark` are command plugins of this repository
+  (`bazel/dnf5/plugins/`) and also work outside Bazel; see `dnf5 lock --help`.
+
+Their tests are in [`e2e/smoke_test`](e2e/smoke_test). The lockfiles of the
+`rpm_lock` cases there are checked in under `testdata/lock_golden/`; accept a
+change with `bazel run //testdata:lock_golden` in that directory.
 
 ## Using the archives directly
 
@@ -152,7 +202,7 @@ common --repo_env=RBE_CONTAINER_IMAGE=docker://<registry>/<image>@sha256:<digest
 |---|---|
 | `dnf5-prebuilt/` | **Public API**: module extension, toolchain rules, release versions. Depends only on `@platforms`. |
 | `bazel/extensions.bzl` | `dnf5_extension`: fetches the upstream dnf5 release (`@dnf5`) with `http_archive`. |
-| `bazel/dnf5/` | Bazel overlay for dnf5 (`dnf5.BUILD.bazel`), upstreamable patches, macOS compatibility shims. |
+| `bazel/dnf5/` | Bazel overlay for dnf5 (`dnf5.BUILD.bazel`), upstreamable patches, macOS compatibility shims, and the `lock`/`rpmdb-mark` command plugins of this repository (`plugins/`). |
 | `bazel/3rdparty/` | Local Bazel registry with the dependencies that are not in the BCR (or needed fixes). |
 | `bazel/release/` | Distribution archive (`dist.bzl`, launcher, bundled licenses). |
 | `bazel/tests/` | Toolchain and third-party library smoke tests. |
