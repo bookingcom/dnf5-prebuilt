@@ -13,29 +13,12 @@ jobs:
     # One job cross-compiles every platform with the hermetic LLVM toolchain,
     # so the platforms share the Bazel server, exec tools and caches.
     runs-on: ubuntu-24.04
-    env:
-      # Repository variable: BuildBuddy host name (gRPC at grpcs://<host>,
-      # invocation links at https://<host>/invocation/).
-      BUILDBUDDY_ENDPOINT: ${{ vars.BUILDBUDDY_ENDPOINT }}
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - uses: bazel-contrib/setup-bazel@0.15.0
+      - uses: ./.github/actions/setup-bazel
         with:
-          bazelisk-cache: true
-          repository-cache: true
-          disk-cache: ${{ env.BUILDBUDDY_ENDPOINT == '' || env.BUILDBUDDY_API_KEY == '' }}
-      - name: Configure remote cache
-        if: env.BUILDBUDDY_ENDPOINT != '' && env.BUILDBUDDY_API_KEY != ''
-        run: |
-          {
-            echo "common --config=buildbuddy-rbe"
-            echo "common:buildbuddy --bes_backend=grpcs://${BUILDBUDDY_ENDPOINT}"
-            echo "common:buildbuddy --bes_results_url=https://${BUILDBUDDY_ENDPOINT}/invocation/"
-            echo "common:buildbuddy --remote_cache=grpcs://${BUILDBUDDY_ENDPOINT}"
-            echo "common:buildbuddy-rbe --remote_executor=grpcs://${BUILDBUDDY_ENDPOINT}"
-            echo "common:buildbuddy --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
-          } > .bazelrc.user
+          buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Test
         run: >
           bazel --bazelrc=.github/workflows/ci.bazelrc test
