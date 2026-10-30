@@ -15,7 +15,12 @@ DEFAULT_VERSION = "5.4.6.0"
 # dnf5 version -> {"tag": release tag, "integrity": {platform: SRI hash}}
 VERSIONS = {
     "5.4.6.0": {
-        "tag": "v5.4.6.0",
-        "integrity": {},
+        "tag": "v5.4.6.0.bcr.2",
+        "integrity": {
+            "linux_amd64": "sha256-1C8zW6wFBGY4K5xsLY6eau5ComZoBrz6OPCXAq6Frd8=",
+            "linux_arm64": "sha256-0I9HMZfHdiUFi0nPsZJ0IWVcJNt8gy9xnPWRnSnJJpw=",
+            "osx_amd64": "sha256-0fPA1QO5LclsJzAx3vE0kXgm8fPD/g3umUWl1m9hYNg=",
+            "osx_arm64": "sha256-RcE2LSFEepXEqJu2rnkJWsWMiG0EUOKOL4qEANVBh3A=",
+        },
     },
 }

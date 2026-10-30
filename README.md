@@ -66,6 +66,12 @@ genrule(
 )
 ```
 
+You can also run dnf5 directly on the host platform:
+
+```sh
+bazel run @dnf5-prebuilt//dnf5-prebuilt:dnf5 -- --version
+```
+
 `dnf5.toolchains(name = "...", version = "...")` selects another name for the
 generated repositories (`<name>_toolchains`, `<name>_<platform>`) or another
 published dnf5 version.
