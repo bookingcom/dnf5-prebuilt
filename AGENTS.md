@@ -19,6 +19,10 @@ is; this file records the rules and the non-obvious lessons.
   the user's remote execution credentials. Never print it either.
 - The user's global gitignore ignores `*.patch`; `.gitignore` re-includes it.
   Run `git status --ignored` before committing new kinds of files.
+- **Git worktrees must be created under `.worktrees`** (e.g.
+  `git worktree add .worktrees/<branch>`). Both `.bazelignore` and `REPO.bazel`
+  ignore `.worktrees` and `e2e/*` so Bazel does not scan or recurse into nested
+  worktrees or end-to-end test workspaces.
 - Avoid `genrule`; use bazel_skylib/bazel_lib/tar.bzl rules or small Starlark
   rules (see `bazel/release/dist.bzl`). Languages: C/C++ (hermetic LLVM), Rust
   via `rules_rs`, Python via `aspect_rules_py` if ever needed; ask the user
