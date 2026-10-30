@@ -6,7 +6,8 @@
 #   ANY2BAZEL_SCRIPTS  any2bazel scripts dir (default ~/.agents/skills/any2bazel/scripts)
 set -euo pipefail
 
-work=$(realpath -m "${1:?usage: $0 <workdir>}")
+mkdir -p "${1:?usage: $0 <workdir>}"
+work=$(cd "$1" && pwd)
 scripts=${ANY2BAZEL_SCRIPTS:-$HOME/.agents/skills/any2bazel/scripts}
 root=$(pwd)
 
