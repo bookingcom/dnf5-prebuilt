@@ -42,6 +42,7 @@ if n != 1:
 open(path, "w").write(new)
 PY
 rm -f "$work/$PREFIX/MODULE.bazel.bak"
+rm -f "$work/$PREFIX/REPO.bazel"
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@0" -C "$work" -cf - "$PREFIX" | gzip -n >"$ARCHIVE"
 
 cat <<NOTES

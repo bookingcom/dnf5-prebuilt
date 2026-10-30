@@ -1,2 +1,3 @@
+.worktrees
 bazel/3rdparty
 e2e/smoke_test
