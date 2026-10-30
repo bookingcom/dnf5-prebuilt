@@ -7,6 +7,13 @@ sh_test(
     env = {"DNF5": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:current_toolchain)"},
 )
 
+sh_test(
+    name = "alias_smoke_test",
+    srcs = ["smoke_test.sh"],
+    data = ["@dnf5-prebuilt//dnf5-prebuilt:dnf5"],
+    env = {"DNF5": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:dnf5)"},
+)
+
 # The README example: $(DNF5) in a genrule.
 genrule(
     name = "dnf5_version",

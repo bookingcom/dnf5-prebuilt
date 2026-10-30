@@ -17,6 +17,20 @@ current_dnf5_toolchain(
     visibility = ["//visibility:public"],
 )
 
+# Convenient aliases so users can invoke `bazel run @dnf5-prebuilt//dnf5-prebuilt:dnf5`
+# or `bazel run @dnf5-prebuilt//dnf5-prebuilt` directly on the host platform.
+alias(
+    name = "dnf5",
+    actual = ":current_toolchain",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "dnf5-prebuilt",
+    actual = ":current_toolchain",
+    visibility = ["//visibility:public"],
+)
+
 exports_files(
     glob(["*.bzl"]),
     visibility = ["//visibility:public"],

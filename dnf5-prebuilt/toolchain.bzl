@@ -40,14 +40,21 @@ dnf5_toolchain = rule(
 
 def _current_dnf5_toolchain_impl(ctx):
     info = ctx.toolchains[Label("//dnf5-prebuilt:toolchain_type")].dnf5_info
+    exe = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.symlink(
+        output = exe,
+        target_file = info.dnf5,
+        is_executable = True,
+    )
     return [
         info,
         DefaultInfo(
-            files = depset([info.dnf5]),
-            runfiles = ctx.runfiles(transitive_files = info.files),
+            executable = exe,
+            files = depset([exe]),
+            runfiles = ctx.runfiles(transitive_files = info.files).merge(ctx.runfiles([exe])),
         ),
         # $(DNF5) in genrule cmd / run_binary args
-        platform_common.TemplateVariableInfo({"DNF5": info.dnf5.path}),
+        platform_common.TemplateVariableInfo({"DNF5": exe.path}),
     ]
 
 current_dnf5_toolchain = rule(
@@ -57,5 +64,6 @@ current_dnf5_toolchain = rule(
 Provides Dnf5Info, the launcher plus the distribution as runfiles, and the
 `$(DNF5)` make variable, so it can be used in `toolchains` of a genrule or in
 `srcs`/`tool` of other rules.""",
+    executable = True,
     toolchains = ["//dnf5-prebuilt:toolchain_type"],
 )

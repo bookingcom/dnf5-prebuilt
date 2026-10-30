@@ -133,3 +133,18 @@ dnf5_extension = use_extension(
     dev_dependency = True,
 )
 use_repo(dnf5_extension, "dnf5")
+
+# Register prebuilt dnf5 toolchains for the repository itself so targets like
+# //dnf5-prebuilt:current_toolchain or //dnf5-prebuilt:dnf5 can resolve a toolchain.
+dnf5 = use_extension(
+    "//dnf5-prebuilt:extensions.bzl",
+    "dnf5",
+    dev_dependency = True,
+)
+dnf5.toolchains()
+use_repo(dnf5, "dnf5_toolchains")
+
+register_toolchains(
+    "@dnf5_toolchains//:all",
+    dev_dependency = True,
+)
