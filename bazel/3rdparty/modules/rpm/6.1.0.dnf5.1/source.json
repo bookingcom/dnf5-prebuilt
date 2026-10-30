@@ -2,7 +2,7 @@
     "integrity": "sha256-9SCBDSfHS/HF2LiIWEXGHgyEX2LTPmiwLgIGM6i2L+M=",
     "overlay": {
         "BUILD.bazel": "sha256-plWeAqYGUaNJwPA9uQRSuPox4cj/hzaHDuAg3i3F/7Q=",
-        "MODULE.bazel": "sha256-TY99k9Pmdd+ynWENAVmyVHmlEDT2oSL4/1ytPioyx8w=",
+        "MODULE.bazel": "sha256-ohUkhFOFbZBTKFZLqQSjQPnnnQ30ai0viKe2hFSyQDo=",
         "bazel/config.h": "sha256-wwqNTZdOcptYusWeCdA3OUkw34StqSLAPqwd3zpaTfI=",
         "bazel/rpmconfig/macros": "sha256-icjQtlcmD+CrWisdSx0HJ5+sPl6u8Vfm4HJqP9styvw=",
         "bazel/rpmconfig/platform/aarch64-linux/macros": "sha256-WzYRBVJvmHCcY3iGV0C7hmnHLb5r8fA+sUx4K2ZfKNs=",
@@ -84,13 +84,15 @@
         "bazel/rpmconfig/platform/x86_64_v2-linux/macros": "sha256-cPMkdCxZUYvvBg1wRpcXOEmNk56Jxq8fCARPLiMi34o=",
         "bazel/rpmconfig/platform/x86_64_v3-linux/macros": "sha256-qhiK5sKymilAf7VwRVFo9GbQ/kBG5OqdokcBd40GwVE=",
         "bazel/rpmconfig/platform/x86_64_v4-linux/macros": "sha256-9IISiiMrFIba4JLFspYXKazqcWApPha/GrSfVTqMp80=",
-        "bazel/rpmconfig/rpmrc": "sha256-jkho5daEfZxPXImezY299IALRvelR/RdpCuRpMB+2Bo=",
+        "bazel/rpmconfig/rpmrc": "sha256-FetdRqf3cKUn4o39I0xFVHFB7EnxCmQyM5zZ3vpUPjw=",
         "bazel/tagtbl.inc": "sha256-BgLGjMU5WbYpMoJ4iM6jJRk5fGoDJnwqVELauLQYc14=",
         "bazel_defs.bzl": "sha256-FpKx4/R2gUaUbOzv7iZsrl9IiOw2ZiLe8/tEN+4pHvk="
     },
     "patch_strip": 1,
     "patches": {
-        "0001-dbiset-include-iterator.patch": "sha256-sJA2I0K6v+Au+C1uEIBXumchnW3OsrsT1hh8XRo4TZA="
+        "0001-dbiset-include-iterator.patch": "sha256-sJA2I0K6v+Au+C1uEIBXumchnW3OsrsT1hh8XRo4TZA=",
+        "0002-strpool-construct-mutex.patch": "sha256-i68/wCkE4HyTIfvCzjjNHTRs5O6nAdJSNgkBL5nKwfU=",
+        "0003-sqlite-close-on-open-failure.patch": "sha256-Yxcw1s60k73DIoeCkYPOaSKXWGkwVB76U6Gxvmjb+Ng="
     },
     "strip_prefix": "rpm-6.1.0",
     "url": "https://github.com/rpm-software-management/rpm/releases/download/rpm-6.1.0-release/rpm-6.1.0.tar.bz2"

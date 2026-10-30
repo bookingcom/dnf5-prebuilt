@@ -123,8 +123,13 @@ bazel_dep(name = "libsolv", version = "0.7.41", dev_dependency = True)
 bazel_dep(name = "librepo", version = "1.21.2", dev_dependency = True)
 bazel_dep(name = "libsmartcols", version = "2.42.4", dev_dependency = True)
 bazel_dep(name = "popt", version = "1.19.dnf5.1", dev_dependency = True)
-bazel_dep(name = "rpm", version = "6.1.0", dev_dependency = True)
+bazel_dep(name = "rpm", version = "6.1.0.dnf5.1", dev_dependency = True)
 bazel_dep(name = "rpm-sequoia", version = "1.10.3", dev_dependency = True)
+
+single_version_override(
+    module_name = "rpm",
+    version = "6.1.0.dnf5.1",
+)
 
 # Upstream dnf5 sources with the Bazel overlay from //bazel/dnf5.
 dnf5_extension = use_extension(

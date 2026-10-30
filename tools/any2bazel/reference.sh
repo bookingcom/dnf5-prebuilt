@@ -7,7 +7,8 @@
 #   FEDORA_IMAGE       container image providing the dnf5 build deps (default fedora:44)
 set -euo pipefail
 
-work=$(realpath -m "${1:?usage: $0 <workdir>}")
+mkdir -p "${1:?usage: $0 <workdir>}"
+work=$(cd "$1" && pwd)
 scripts=${ANY2BAZEL_SCRIPTS:-$HOME/.agents/skills/any2bazel/scripts}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
