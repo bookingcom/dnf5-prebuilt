@@ -1,0 +1,23 @@
+{
+  "version":1,
+  "arch":"x86_64,noarch",
+  "requested":[
+    "mystery-devel",
+    "tour"
+  ],
+  "packages":[
+    {
+      "name":"mystery-devel",
+      "version":"19.67-1",
+      "arch":"noarch",
+      "nevra":"mystery-devel-19.67-1.noarch",
+      "url":"file:@EXECROOT@\/_main\/bazel-out\/@CONFIG@\/bin\/testdata\/repo\/disagree\/mystery-devel-19.67-1.noarch.rpm",
+      "integrity":"sha256-meIRQlcrHAZdq1q\/LxdYaYAceVk4wf+Rx\/GUyaUYDKU=",
+      "checksum":"99e21142572b1c065dab5abf2f175869801c795938c1ff91c7f194c9a5180ca5",
+      "requested":true,
+      "dependencies":[],
+      "dependencies_nevra":[],
+      "transitive_dependencies":[]
+    }
+  ]
+}

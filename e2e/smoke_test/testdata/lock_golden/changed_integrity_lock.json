@@ -1,0 +1,22 @@
+{
+  "version":1,
+  "arch":"x86_64,noarch",
+  "requested":[
+    "tour"
+  ],
+  "packages":[
+    {
+      "name":"tour",
+      "version":"4-6",
+      "arch":"noarch",
+      "nevra":"tour-4-6.noarch",
+      "url":"file:@EXECROOT@\/_main\/bazel-out\/@CONFIG@\/bin\/testdata\/repo\/disagree\/tour-4-6.noarch.rpm",
+      "integrity":"sha256-SWw+Ahx2lWgvOVTUOVw+a+c4XWcMo1X63lm6bfaYpIo=",
+      "checksum":"496c3e021c7695682f3954d4395c3e6be7385d670ca355fade59ba6df698a48a",
+      "requested":true,
+      "dependencies":[],
+      "dependencies_nevra":[],
+      "transitive_dependencies":[]
+    }
+  ]
+}

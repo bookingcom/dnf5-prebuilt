@@ -1,5 +1,14 @@
 """Providers of the dnf5-prebuilt rules."""
 
+RpmLockFileInfo = provider(
+    doc = "Propagates generated RPM lockfile details and dependency closure.",
+    fields = {
+        "arch": "Target architecture(s) for the lockfile",
+        "lock_file": "File object representing the output lock JSON file",
+        "packages": "List of package names included in the lockfile",
+    },
+)
+
 DnfConfigInfo = provider(
     doc = "A rendered dnf5 configuration and the command line preamble that pins it.",
     fields = {

@@ -53,6 +53,9 @@ fi
 
 for arg in "$@"; do
     case "$arg" in
+        lock)
+            exec "${PYTHON3:-python3}" "$prefix/lib/rpm_tools/rpm_lock.py" --dnf5="$self" --rpm="$prefix/bin/rpm" "$@"
+            ;;
         rpmdb-mark)
             exec "${PYTHON3:-python3}" "$prefix/lib/rpm_tools/rpm_mark.py" --dnf5="$self" --rpm="$prefix/bin/rpm" "$@"
             ;;
