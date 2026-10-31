@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "ol9_repo/curl-7.76.1-40.el9_8.8.x86_64.rpm",
+    "ol9_repo/libcurl-7.76.1-40.el9_8.8.x86_64.rpm",
+    "ol9_repo/ol9.repo",
+])
+
+filegroup(
+    name = "ol9_repo_files",
+    srcs = glob(["ol9_repo/**"]),
+)
