@@ -47,6 +47,7 @@ is; this file records the rules and the non-obvious lessons.
   `RPM_CONFIGDIR`, `DNF5_PLUGINS_DIR`, `pluginpath`, `pluginconfpath`,
   `sslcacert`.
 - `tools/any2bazel/`, `any2bazel.json` — parity with upstream CMake.
+- `docs/` — guides on [RPM dependency resolution and repodata integrity](docs/rpm-dependency-resolution.md) and [direct RPM-to-OCI layer merging with bsdtar](docs/rpm-to-oci-layer.md).
 
 ## Local registry (`bazel/3rdparty`)
 
