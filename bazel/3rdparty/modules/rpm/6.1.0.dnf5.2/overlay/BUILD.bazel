@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("//:bazel_defs.bzl", "private_includes")
 
 package(default_visibility = ["//visibility:public"])
@@ -198,6 +198,38 @@ cc_library(
         ":librpm",
         ":librpmio",
     ],
+)
+
+cc_binary(
+    name = "rpm_bin",
+    srcs = [
+        "tools/cliutils.cc",
+        "tools/cliutils.hh",
+        "tools/rpm.cc",
+    ],
+    conlyopts = CONLYOPTS,
+    copts = COPTS + private_includes([
+        "tools",
+        "lib",
+        "rpmio",
+    ]),
+    cxxopts = CXXOPTS,
+    local_defines = DEFINES,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":headers",
+        ":librpm",
+        ":librpmbuild",
+        ":librpmio",
+        ":private_headers",
+        "@popt",
+    ],
+)
+
+alias(
+    name = "rpm_cli",
+    actual = ":rpm_bin",
+    visibility = ["//visibility:public"],
 )
 
 # Runtime configuration directory (RPM_CONFIGDIR, /usr/lib/rpm upstream):

@@ -11,8 +11,16 @@ toolchain_type(
 # current_dnf5_toolchain in toolchain.bzl.
 current_dnf5_toolchain(
     name = "current_toolchain",
+    binary = "dnf5",
     # Needs a registered dnf5 toolchain, which this repository itself does not
     # have (see e2e/smoke_test).
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+current_dnf5_toolchain(
+    name = "current_rpm_toolchain",
+    binary = "rpm",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )
@@ -28,6 +36,12 @@ alias(
 alias(
     name = "dnf5-prebuilt",
     actual = ":current_toolchain",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "rpm",
+    actual = ":current_rpm_toolchain",
     visibility = ["//visibility:public"],
 )
 

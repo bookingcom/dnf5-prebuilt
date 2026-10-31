@@ -5,7 +5,7 @@
         "github:rpm-software-management/rpm"
     ],
     "versions": [
-        "6.1.0.dnf5.1"
+        "6.1.0.dnf5.2"
     ],
     "yanked_versions": {}
 }

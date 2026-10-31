@@ -4,7 +4,9 @@ load(":dist.bzl", "dnf5_distribution", "dnf5_multiplatform_distribution")
 # Relocatable dnf5 distribution for the target platform:
 #
 #   dnf5/bin/dnf5                     launcher (dnf5.sh)
+#   dnf5/bin/rpm                      launcher (rpm.sh)
 #   dnf5/libexec/dnf5                 dnf5 executable
+#   dnf5/libexec/rpm                  rpm executable
 #   dnf5/lib/                         libdnf5, libdnf5-cli, libdnf5-deps
 #   dnf5/lib/dnf5/plugins/            dnf5 command plugins
 #   dnf5/lib/libdnf5/plugins/         libdnf5 plugins
@@ -40,7 +42,9 @@ dnf5_distribution(
     name = "dnf5",
     srcs = {
         ":dnf5.sh": "bin",
+        ":rpm.sh": "bin",
         "@dnf5//:dnf5": "libexec",
+        "@rpm//:rpm_bin": "libexec",
         "@dnf5//:libdnf5": "lib",
         "@dnf5//:libdnf5-cli": "lib",
         "@dnf5//:libdnf5-deps": "lib",
@@ -65,10 +69,17 @@ dnf5_distribution(
     executables = [
         "dnf5",
         "dnf5.sh",
+        "rpm",
+        "rpm.sh",
+        "rpm_bin",
         "sysusers.sh",
     ],
     prefix = "dnf5",
-    renames = {"dnf5.sh": "dnf5"},
+    renames = {
+        "dnf5.sh": "dnf5",
+        "rpm.sh": "rpm",
+        "rpm_bin": "rpm",
+    },
     visibility = ["//visibility:public"],
 )
 

@@ -1,8 +1,8 @@
 {
     "integrity": "sha256-9SCBDSfHS/HF2LiIWEXGHgyEX2LTPmiwLgIGM6i2L+M=",
     "overlay": {
-        "BUILD.bazel": "sha256-plWeAqYGUaNJwPA9uQRSuPox4cj/hzaHDuAg3i3F/7Q=",
-        "MODULE.bazel": "sha256-ohUkhFOFbZBTKFZLqQSjQPnnnQ30ai0viKe2hFSyQDo=",
+        "BUILD.bazel": "sha256-XQIj7HZ6yPWsf0DW13KjuGsO5NYQPoz0HA2V2mBDOp8=",
+        "MODULE.bazel": "sha256-B+1Q6ksbp8IfjUxgMk37KdFpXrEdcrrAjSz3cZGNNwQ=",
         "bazel/config.h": "sha256-wwqNTZdOcptYusWeCdA3OUkw34StqSLAPqwd3zpaTfI=",
         "bazel/rpmconfig/macros": "sha256-icjQtlcmD+CrWisdSx0HJ5+sPl6u8Vfm4HJqP9styvw=",
         "bazel/rpmconfig/platform/aarch64-linux/macros": "sha256-WzYRBVJvmHCcY3iGV0C7hmnHLb5r8fA+sUx4K2ZfKNs=",

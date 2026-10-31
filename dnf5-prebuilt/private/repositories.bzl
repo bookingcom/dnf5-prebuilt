@@ -7,7 +7,7 @@ load("@dnf5-prebuilt//dnf5-prebuilt:toolchain.bzl", "dnf5_toolchain")
 
 package(default_visibility = ["//visibility:public"])
 
-exports_files(["bin/dnf5"])
+exports_files(["bin/dnf5", "bin/rpm"])
 
 filegroup(
     name = "files",
@@ -17,6 +17,7 @@ filegroup(
 dnf5_toolchain(
     name = "dnf5_toolchain",
     dnf5 = "bin/dnf5",
+    rpm = "bin/rpm",
     files = [":files"],
     version = "{version}",
 )
