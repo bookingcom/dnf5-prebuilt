@@ -1,4 +1,4 @@
-load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config")
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_mark")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
@@ -90,5 +90,37 @@ sh_test(
         ":dnf5_test_lib",
         ":ol9_dnf_config",
         DNF5,
+    ],
+)
+
+# --- rpm_mark ---------------------------------------------------------------
+
+rpm_mark(
+    name = "ol9_marked_rpmdb",
+    arch = "x86_64",
+    packages = [
+        "curl=7.76.1-40.el9_8.8",
+    ],
+    releasever = "9",
+    repo_config = "//testdata:ol9_repo/ol9.repo",
+    repo_files = ["//testdata:ol9_repo_files"],
+)
+
+# rpm_mark and the standalone `dnf5 rpmdb-mark`: the rpmdb holds exactly curl and libcurl.
+sh_test(
+    name = "rpm_mark_test",
+    srcs = ["test_rpm_mark.sh"],
+    args = [
+        "$(rootpath :ol9_marked_rpmdb)",
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        ":ol9_marked_rpmdb",
+        DNF5,
+        "//testdata:ol9_repo_files",
     ],
 )

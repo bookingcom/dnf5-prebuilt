@@ -153,3 +153,18 @@ register_toolchains(
     "@dnf5_toolchains//:all",
     dev_dependency = True,
 )
+
+bazel_dep(name = "aspect_rules_py", version = "2.0.0-alpha.8")
+
+python = use_extension("@aspect_rules_py//py:extensions.bzl", "python_interpreters")
+python.toolchain(python_version = "3.12")
+use_repo(
+    python,
+    "python_3_12_aarch64_apple_darwin",
+    "python_3_12_aarch64_unknown_linux_gnu",
+    "python_3_12_x86_64_apple_darwin",
+    "python_3_12_x86_64_unknown_linux_gnu",
+    "python_interpreters",
+)
+
+register_toolchains("@python_interpreters//:all")
