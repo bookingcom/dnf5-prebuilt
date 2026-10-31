@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Runs `dnf5 lock --lockfile` on small metadata-only repos and checks what it locks on top of the layer below.
+
+Args: <dnf5> <preamble.args of a dnf_config>.
+"""
+
+import base64
+import gzip
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+DNF5 = os.path.abspath(sys.argv[1])
+DNF5_PREAMBLE = os.path.abspath(sys.argv[2])
+TMP = tempfile.mkdtemp()
+
+
+def lock_command(root, archlist, request):
+    """The command line that locks request on top of root/below.lock.json."""
+    with open(f"{root}/dnf.conf", "w", encoding="utf-8") as f:
+        f.write("[main]\nbest=True\ninstall_weak_deps=True\nplugins=False\nprotected_packages=\nuser_agent=libdnf\n")
+    os.makedirs(f"{root}/tmp/root")
+    with open(DNF5_PREAMBLE, encoding="utf-8") as f:
+        preamble = [line.replace("@CONFDIR@", root).replace("@REPODIR@", root).replace("@TMP@", f"{root}/tmp")
+                    for line in f.read().splitlines()]
+    return [DNF5, *preamble, "lock", f"--archlist={archlist}", f"--lockfile={root}/below.lock.json",
+            "-o", f"{root}/out.json", *request]
+
+
+LAST_OUT = {}  # the lockfile the last successful lock() wrote
+
+
+def pkgid(name, ver, arch):
+    return hashlib.sha256(f"{name}-{ver}.{arch}".encode()).hexdigest()
+
+
+def entries(tag, deps):
+    """deps: names, or (name, version) pairs for an EQ relation."""
+    if not deps:
+        return ""
+    xml = "".join(
+        f'<rpm:entry name="{d}"/>' if isinstance(d, str)
+        else f'<rpm:entry name="{d[0]}" flags="EQ" epoch="0" ver="{d[1]}" rel="1"/>'
+        for d in deps)
+    return f"<rpm:{tag}>{xml}</rpm:{tag}>"
+
+
+def write_repo(root, pkgs):
+    """pkgs: dicts with name, and optionally ver, arch, provides, requires, obsoletes."""
+    xml = []
+    for p in pkgs:
+        name, ver, arch = p["name"], p.get("ver", "1"), p.get("arch", "noarch")
+        deps = (entries("provides", [(name, ver)] + p.get("provides", [])) +
+                entries("requires", p.get("requires", [])) + entries("obsoletes", p.get("obsoletes", [])) +
+                entries("recommends", p.get("recommends", [])))
+        xml.append(f"""<package type="rpm"><name>{name}</name><arch>{arch}</arch>
+<version epoch="0" ver="{ver}" rel="1"/><checksum type="sha256" pkgid="YES">{pkgid(name, ver, arch)}</checksum>
+<summary>s</summary><description>d</description><packager/><url/><time file="1" build="1"/>
+<size package="1" installed="1" archive="1"/><location href="{name}-{ver}-1.{arch}.rpm"/>
+<format><rpm:license>MIT</rpm:license><rpm:vendor/><rpm:group>x</rpm:group><rpm:buildhost>h</rpm:buildhost>
+<rpm:sourcerpm>{name}-{ver}-1.src.rpm</rpm:sourcerpm><rpm:header-range start="1" end="2"/>{deps}</format></package>""")
+    primary = ('<?xml version="1.0" encoding="UTF-8"?>\n<metadata xmlns="http://linux.duke.edu/metadata/common" '
+               f'xmlns:rpm="http://linux.duke.edu/metadata/rpm" packages="{len(xml)}">'
+               + "".join(xml) + "</metadata>").encode()
+    gz = gzip.compress(primary, mtime=0)
+    os.makedirs(f"{root}/repo/repodata")
+    with open(f"{root}/repo/repodata/primary.xml.gz", "wb") as f:
+        f.write(gz)
+    with open(f"{root}/repo/repodata/repomd.xml", "w", encoding="utf-8") as f:
+        f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo"><revision>1</revision><data type="primary">
+<checksum type="sha256">{hashlib.sha256(gz).hexdigest()}</checksum>
+<open-checksum type="sha256">{hashlib.sha256(primary).hexdigest()}</open-checksum>
+<location href="repodata/primary.xml.gz"/><timestamp>1</timestamp><size>{len(gz)}</size>
+<open-size>{len(primary)}</open-size></data></repomd>
+""")
+    os.makedirs(f"{root}/repos.d")
+    with open(f"{root}/repos.d/layers.repo", "w", encoding="utf-8") as f:
+        f.write(f"[layers]\nname=layers\nbaseurl=file://{root}/repo\ngpgcheck=0\nenabled=1\n")
+
+
+def locked(name, ver="1", arch="noarch"):
+    """A lockfile entry for a package of write_repo, as `dnf5 lock` writes it."""
+    integrity = "sha256-" + base64.b64encode(bytes.fromhex(pkgid(name, ver, arch))).decode()
+    return {"name": name, "version": f"{ver}-1", "arch": arch, "nevra": f"{name}-{ver}-1.{arch}",
+            "integrity": integrity}
+
+
+def lock(case, repo, below, request, archlist="x86_64,i686,noarch", lockfile_arch="x86_64,i686,noarch"):
+    """Locks request on top of the lockfile entries below; returns (exit code, locked NEVRAs, stderr, obsoleted).
+
+    lockfile_arch is the "arch" of the lockfile below, None for a JSON null.
+    """
+    root = f"{TMP}/{case.replace(' ', '-')}"
+    write_repo(root, repo)
+    with open(f"{root}/below.lock.json", "w", encoding="utf-8") as f:
+        json.dump({"version": 1, "arch": lockfile_arch, "packages": below}, f)
+    r = subprocess.run(lock_command(root, archlist, request), capture_output=True, text=True, check=False)
+    nevras = []
+    obsoleted = []
+    if r.returncode == 0:
+        with open(f"{root}/out.json", encoding="utf-8") as f:
+            data = json.load(f)
+            nevras = sorted(p["nevra"] for p in data["packages"])
+            LAST_OUT.update(data)
+            obsoleted = data.get("obsoleted", [])
+    return r.returncode, nevras, r.stderr, obsoleted
+
+
+def check(case, got, want, stderr):
+    if got != want:
+        sys.exit(f"FAIL {case}: got {got}, want {want}\n{stderr}")
+    print(f"ok   {case}")
+
+
+def expect_locked(case, repo, below, request, want):
+    """Locks request on top of below and checks that it succeeds and locks exactly the NEVRAs in want."""
+    rc, nevras, err, _ = lock(case, repo, below, request)
+    check(case, (rc, nevras), (0, want), err)
+
+
+def without_integrity(entry):
+    """A layer entry that does not say which build it is."""
+    return {k: v for k, v in entry.items() if k != "integrity"}
+
+
+expect_locked(
+    "installonly versions below are all installed",
+    [{"name": "kernel", "ver": "1", "arch": "x86_64"}, {"name": "kernel", "ver": "2", "arch": "x86_64"},
+     {"name": "needs-kernel-1", "requires": [("kernel", "1")]}],
+    [locked("kernel", "1", "x86_64"), locked("kernel", "2", "x86_64")],
+    ["needs-kernel-1"], ["needs-kernel-1-1-1.noarch"])
+
+expect_locked(
+    "every arch below is installed",
+    [{"name": "foo", "arch": "x86_64"}, {"name": "foo", "arch": "i686", "provides": ["foo-32bit"]},
+     {"name": "needs-foo-32bit", "requires": ["foo-32bit"]}],
+    [locked("foo", arch="i686"), locked("foo", arch="x86_64")],
+    ["needs-foo-32bit"], ["needs-foo-32bit-1-1.noarch"])
+
+expect_locked(
+    "a later layer still replaces a package of an earlier one",
+    [{"name": "tour", "ver": "1"}, {"name": "tour", "ver": "2"}, {"name": "app", "requires": ["tour"]}],
+    [locked("tour", "1"), locked("tour", "2")],
+    ["app", "tour"], ["app-1-1.noarch"])
+
+CASE = "obsoleting a package below records it and warns"
+rc, nevras, err, obsoleted = lock(CASE, [{"name": "old"}, {"name": "new", "obsoletes": ["old"]}], [locked("old")], ["new"])
+check(CASE, (rc, nevras, obsoleted, "the solve obsoletes old-1-1.noarch from a layer below" in err),
+      (0, ["new-1-1.noarch"], [{"name": "old", "version": "1-1", "arch": "noarch", "nevra": "old-1-1.noarch"}], True), err)
+
+# A layer entry without integrity means "same build". The old code compared it with the repo's integrity
+# via g_strcmp0 (NULL vs "sha256-..." is nonzero), so a requested package installed at the same NEVRA was
+# locked again. A package kept as it is does not bring in its Recommends ("dep"), as in dnf; "extra" is unrelated.
+APP1 = [{"name": "app", "ver": "1", "recommends": ["dep"]}, {"name": "dep"}, {"name": "extra"}]
+APP12 = [{"name": "app", "ver": "2", "recommends": ["dep"]}, *APP1]
+NO_INTEGRITY = without_integrity(locked("app", "1"))
+for CASE, repo, entry, want in [
+        ("a layer entry without integrity at the same NEVRA is unchanged", APP1, NO_INTEGRITY,
+         ["extra-1-1.noarch"]),
+        ("a layer entry with an empty integrity at the same NEVRA is unchanged", APP1,
+         {**NO_INTEGRITY, "integrity": ""}, ["extra-1-1.noarch"]),
+        ("a layer entry without integrity at another NEVRA is replaced", APP12, NO_INTEGRITY,
+         ["app-2-1.noarch", "extra-1-1.noarch"]),
+        ("a layer entry with another integrity counts as changed", APP1,
+         {**NO_INTEGRITY, "integrity": "sha256-AAAA"}, ["app-1-1.noarch", "dep-1-1.noarch", "extra-1-1.noarch"])]:
+    expect_locked(CASE, repo, [entry], ["app", "extra"], want)
+
+# dnf leaves a package alone when the layer below holds it at the repositories' version or newer, so the
+# Recommends of the repositories' copy are not installed. An install job for that copy would count them.
+PKG1 = [{"name": "pkg", "ver": "1", "recommends": ["rec"]}, {"name": "rec"}, {"name": "extra"}]
+for CASE, below in [
+        ("a layer package newer than the repositories gets no weak dependencies", without_integrity(locked("pkg", "2"))),
+        ("a layer package newer than the repositories keeps its integrity and is not downgraded", locked("pkg", "2")),
+        ("a layer package at the repositories' version gets no weak dependencies", without_integrity(locked("pkg", "1"))),
+        ("a layer package at the repositories' version with its integrity is unchanged", locked("pkg", "1"))]:
+    expect_locked(CASE, PKG1, [below], ["pkg", "extra"], ["extra-1-1.noarch"])
+
+# An upgrade adds only the weak dependencies that are new: the Recommends the layer's build of the package
+# already made (and left unmet) stay out, as in `dnf update`. Known only when the repositories hold that build.
+expect_locked("an upgrade skips the Recommends the layer's build left unmet",
+              [{"name": "pkg", "ver": "1", "recommends": ["rec"]},
+               {"name": "pkg", "ver": "2", "recommends": ["rec", "rec2"]}, {"name": "rec"}, {"name": "rec2"}],
+              [without_integrity(locked("pkg", "1"))], ["pkg"], ["pkg-2-1.noarch", "rec2-1-1.noarch"])
+
+# The lock records each package's Recommends and Supplements, so that a later lock knows what the layer's
+# build left unmet even when the repositories no longer hold that build.
+CASE = "a lockfile records the weak dependencies of its packages"
+rc, nevras, err, obsoleted = lock(CASE, [{"name": "pkg", "ver": "2", "recommends": ["rec", "rec2"]},
+                                         {"name": "rec"}, {"name": "rec2"}], [], ["pkg"])
+recorded = {p["name"]: p.get("recommends") for p in LAST_OUT["packages"]}
+check(CASE, (rc, recorded), (0, {"pkg": ["rec", "rec2"], "rec": None, "rec2": None}), err)
+
+UPGRADE = [{"name": "pkg", "ver": "2", "recommends": ["rec", "rec2"]}, {"name": "rec"}, {"name": "rec2"}]
+expect_locked("an upgrade skips the Recommends recorded for a build the repositories lack", UPGRADE,
+              [{**locked("pkg", "1"), "recommends": ["rec"]}], ["pkg"], ["pkg-2-1.noarch", "rec2-1-1.noarch"])
+
+expect_locked("an upgrade of a build without recorded Recommends locks all weak dependencies", UPGRADE,
+              [locked("pkg", "1")], ["pkg"], ["pkg-2-1.noarch", "rec-1-1.noarch", "rec2-1-1.noarch"])
+
+# dnf installs the Recommends of what it installs (install_weak_deps=True), unless a layer below has them.
+expect_locked("a Recommends missing below is locked with its package",
+              [{"name": "app", "recommends": ["extra"]}, {"name": "extra"}, {"name": "base"}],
+              [locked("base")], ["app"], ["app-1-1.noarch", "extra-1-1.noarch"])
+
+expect_locked("a Recommends installed below is not locked again",
+              [{"name": "app", "recommends": ["extra"]}, {"name": "extra"}],
+              [locked("extra")], ["app"], ["app-1-1.noarch"])
+
+# app requires tour: the repo of the malformed-lockfile cases.
+TOUR_APP = [{"name": "tour"}, {"name": "app", "requires": ["tour"]}]
+for CASE, entry, message in [
+        ("a lockfile entry without a name is an error",
+         {"version": "1-1", "arch": "noarch", "nevra": "tour-1-1.noarch"}, "package 0 has no name"),
+        ("a lockfile entry with a non-string name is an error",
+         {**locked("tour"), "name": 123}, "package 0 has a non-string name"),
+        ("a lockfile entry with a non-string nevra is an error",
+         {**locked("tour"), "nevra": 5}, "package 0 has a non-string nevra"),
+        ("a lockfile entry with a line break in a dependency is an error",
+         {**locked("tour"), "dependencies": ["x\n=Pkg: forged 1 1 noarch\n=Prv: app"]},
+         "package 0 has a line break in dependencies"),
+        ("a lockfile entry with a line break in its version is an error",
+         {**locked("tour"), "version": "1-1\n=Pkg: forged 1 1 noarch"}, "package 0 has a line break in version")]:
+    rc, nevras, err, obsoleted = lock(CASE, TOUR_APP, [entry], ["app"])
+    check(CASE, (rc != 0, message in err), (True, True), err)
+
+CASE = "a lockfile with a null arch is locked with --archlist"
+rc, nevras, err, obsoleted = lock(CASE, TOUR_APP, [locked("tour")], ["app"], lockfile_arch=None)
+check(CASE, (rc, nevras), (0, ["app-1-1.noarch"]), err)
+
+CASE = "a lockfile with a non-string arch is an error"
+rc, nevras, err, obsoleted = lock(CASE, TOUR_APP, [locked("tour")], ["app"], lockfile_arch=7)
+check(CASE, (rc != 0, "arch is not a string" in err), (True, True), err)
