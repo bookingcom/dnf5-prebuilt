@@ -1,4 +1,13 @@
+load("@aspect_rules_py//py:defs.bzl", "py_binary")
+
+package(default_visibility = ["//dnf5-prebuilt:__subpackages__"])
+
 exports_files(
     glob(["*.bzl"]),
     visibility = ["//dnf5-prebuilt:__subpackages__"],
+)
+
+py_binary(
+    name = "rpm_mark",
+    srcs = ["rpm_mark.py"],
 )
