@@ -59,6 +59,7 @@ dnf5_distribution(
         # and of this repository (the launcher).
         ":licenses": "share/licenses",
         "//:LICENSE": "share/licenses/dnf5-prebuilt",
+        "//dnf5-prebuilt/tools:rpm_lock.py": "lib/rpm_tools",
         "//dnf5-prebuilt/tools:rpm_mark.py": "lib/rpm_tools",
     } | {
         "@dnf5//:" + p: "lib/dnf5/plugins"
