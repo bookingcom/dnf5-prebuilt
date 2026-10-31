@@ -122,6 +122,13 @@ Notes:
   `automatic` and `needs-restarting` plugins, appstream/rhsm/python plugin
   loaders, language bindings, translations and documentation.
 
+## Guides and workflows
+
+- [RPM Dependency Trees, URL Resolution, and Integrity Extraction](docs/rpm-dependency-resolution.md):
+  Resolving dependency trees as JSON/ASCII, resolving package URLs in $O(1)$, and extracting SHA-256 integrity from repodata without Docker.
+- [Converting and Merging RPMs into OCI Tar Layers](docs/rpm-to-oci-layer.md):
+  Streaming RPM packages directly into OCI container layer tar archives with `bsdtar`.
+
 ## Building from source
 
 Requirements: [Bazelisk](https://github.com/bazelbuild/bazelisk) (the Bazel
@@ -167,6 +174,7 @@ common --repo_env=RBE_CONTAINER_IMAGE=docker://<registry>/<image>@sha256:<digest
 | `e2e/smoke_test/` | Consumer of the public module. |
 | `tools/any2bazel/` | Build parity check against upstream's CMake build. |
 | `tools/licenses/` | Collects the licenses of bundled components. |
+| `docs/` | Guides for RPM dependency resolution and OCI layer creation. |
 
 Everything except `dnf5-prebuilt/` is private: it is only used to build the
 archives, and its dependencies are `dev_dependency` modules that users of the
