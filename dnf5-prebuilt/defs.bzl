@@ -6,7 +6,12 @@ load(
     _current_dnf5_toolchain = "current_dnf5_toolchain",
     _dnf5_toolchain = "dnf5_toolchain",
 )
+load(
+    "//dnf5-prebuilt/private:config.bzl",
+    _dnf_config = "dnf_config",
+)
 
 Dnf5Info = _Dnf5Info
 current_dnf5_toolchain = _current_dnf5_toolchain
 dnf5_toolchain = _dnf5_toolchain
+dnf_config = _dnf_config

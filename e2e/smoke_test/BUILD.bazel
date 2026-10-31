@@ -1,10 +1,15 @@
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
+
+DNF5_ROOTPATH = "$(rootpath %s)" % DNF5
 
 sh_test(
     name = "smoke_test",
     srcs = ["smoke_test.sh"],
-    data = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
-    env = {"DNF5": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:current_toolchain)"},
+    data = [DNF5],
+    env = {"DNF5": DNF5_ROOTPATH},
 )
 
 sh_test(
@@ -26,8 +31,8 @@ genrule(
     name = "dnf5_version",
     outs = ["dnf5_version.txt"],
     cmd = "$(DNF5) --version > $@",
-    toolchains = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
-    tools = ["@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"],
+    toolchains = [DNF5],
+    tools = [DNF5],
 )
 
 sh_test(
@@ -35,4 +40,55 @@ sh_test(
     srcs = ["genrule_test.sh"],
     data = [":dnf5_version"],
     env = {"VERSION_FILE": "$(rootpath :dnf5_version)"},
+)
+
+# --- The rules: dnf_config --------------------------------------------------
+
+# dnf_config renders dnf.conf and the .repo file; the preamble makes dnf5 read only those.
+dnf_config(
+    name = "ol9_dnf_config",
+    excludepkgs = ["mystery-devel"],
+    install_weak_deps = False,
+    module_platform_id = "platform:el9",
+    releasever = "9",
+    repo_configs = ["//testdata:ol9_repo/ol9.repo"],
+    repo_files = ["//testdata:ol9_repo_files"],
+)
+
+filegroup(
+    name = "dnf5_test_lib",
+    srcs = ["dnf5_lib.sh"],
+)
+
+sh_test(
+    name = "dnf5_config_smoke_test",
+    srcs = ["test_dnf5_config.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+    ],
+    data = [
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        DNF5,
+    ],
+)
+
+# dnf5's effective configuration under the preamble holds no host path and equals the golden file.
+sh_test(
+    name = "dnf5_config_golden_test",
+    srcs = ["test_dnf5_config_golden.sh"],
+    args = [
+        DNF5_ROOTPATH,
+        "$(rootpath :ol9_dnf_config)",
+        "testdata/ol9_repo",
+        "$(rootpath dnf5_config_golden.txt)",
+    ],
+    data = [
+        "dnf5_config_golden.txt",
+        ":dnf5_test_lib",
+        ":ol9_dnf_config",
+        DNF5,
+    ],
 )
