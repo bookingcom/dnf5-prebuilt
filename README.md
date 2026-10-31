@@ -66,10 +66,11 @@ genrule(
 )
 ```
 
-You can also run dnf5 directly on the host platform:
+You can also run dnf5 or rpm directly on the host platform:
 
 ```sh
 bazel run @dnf5-prebuilt//dnf5-prebuilt:dnf5 -- --version
+bazel run @dnf5-prebuilt//dnf5-prebuilt:rpm -- --version
 ```
 
 `dnf5.toolchains(name = "...", version = "...")` selects another name for the
