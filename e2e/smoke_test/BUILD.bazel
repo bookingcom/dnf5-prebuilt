@@ -1,4 +1,4 @@
-load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config")
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_mark")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
@@ -22,8 +22,18 @@ sh_test(
 sh_test(
     name = "rpm_smoke_test",
     srcs = ["rpm_smoke_test.sh"],
-    data = ["@dnf5-prebuilt//dnf5-prebuilt:rpm"],
-    env = {"RPM": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:rpm)"},
+    data = [
+        ":ol9_base_rpmdb",
+        ":ol9_layered_rpmdb",
+        ":ol9_marked_rpmdb",
+        "@dnf5-prebuilt//dnf5-prebuilt:rpm",
+    ],
+    env = {
+        "RPM": "$(rootpath @dnf5-prebuilt//dnf5-prebuilt:rpm)",
+        "RPMDB_BASE": "$(rootpath :ol9_base_rpmdb)",
+        "RPMDB_LAYERED": "$(rootpath :ol9_layered_rpmdb)",
+        "RPMDB_SINGLE": "$(rootpath :ol9_marked_rpmdb)",
+    },
 )
 
 # The README example: $(DNF5) in a genrule.
@@ -90,5 +100,30 @@ sh_test(
         ":dnf5_test_lib",
         ":ol9_dnf_config",
         DNF5,
+    ],
+)
+
+# --- rpm_mark ---------------------------------------------------------------
+
+rpm_mark(
+    name = "ol9_marked_rpmdb",
+    rpms = [
+        "//testdata:ol9_repo/curl-7.76.1-40.el9_8.8.x86_64.rpm",
+        "//testdata:ol9_repo/libcurl-7.76.1-40.el9_8.8.x86_64.rpm",
+    ],
+)
+
+rpm_mark(
+    name = "ol9_base_rpmdb",
+    rpms = [
+        "//testdata:ol9_repo/libcurl-7.76.1-40.el9_8.8.x86_64.rpm",
+    ],
+)
+
+rpm_mark(
+    name = "ol9_layered_rpmdb",
+    base_rpmdb = ":ol9_base_rpmdb",
+    rpms = [
+        "//testdata:ol9_repo/curl-7.76.1-40.el9_8.8.x86_64.rpm",
     ],
 )
