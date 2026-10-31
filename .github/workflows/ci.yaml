@@ -60,3 +60,11 @@ jobs:
           chmod +x /usr/local/bin/buildifier
           # Committed registry modules are immutable, so they are not checked.
           git ls-files '*.bazel' '*.bzl' | grep -v '^bazel/3rdparty/modules/' | xargs buildifier -mode=check -lint=warn
+
+  clang-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check C++ formatting of the command plugins
+        # The version upstream dnf5 pins in its .pre-commit-config.yaml.
+        run: pipx run --spec clang-format==19.1.0 clang-format --dry-run --Werror bazel/dnf5/plugins/*.cpp bazel/dnf5/plugins/*.hpp
