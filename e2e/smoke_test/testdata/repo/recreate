@@ -1,0 +1,24 @@
+#!/bin/bash
+# Rebuilds the test packages reproducibly (same bytes on every run) with SHA-256
+# header and payload digests, which rpm >= 6 requires. Run on Fedora 44 with
+# rpm-build installed; generate_repodata.py holds their metadata (checksum,
+# sizes, header range, file lists), so update it after a change here.
+set -euo pipefail
+
+THISDIR=$(readlink -f "$(dirname "$0")")
+cd "$THISDIR"
+export SOURCE_DATE_EPOCH=1404109194
+opts=(
+  --define "_topdir $(mktemp -d)"
+  --define "_rpmdir $THISDIR"
+  --define "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm"
+  --define "python_sitelib /usr/lib/python2.7/site-packages"
+  --define "__brp_python_bytecompile %{nil}"
+  --define "_buildhost localhost.localdomain"
+  --define "use_source_date_epoch_as_buildtime 1"
+  --define "clamp_mtime_to_source_date_epoch 1"
+  --define "_binary_payload w9.gzdio"
+)
+for spec in tour.spec mystery.spec; do
+  rpmbuild -bb "${opts[@]}" "$spec"
+done
