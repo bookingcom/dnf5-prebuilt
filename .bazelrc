@@ -71,6 +71,18 @@ build:linux_arm64 --@openssl//:use-no-asm-fallback
 build:osx_amd64 --platforms=//bazel:osx_amd64
 build:osx_arm64 --platforms=//bazel:osx_arm64
 
+# ASan + LSan + UBSan (`--config=asan`): dnf5 and every C/C++ dependency built
+# with the hermetic LLVM toolchain's sanitizers. Run the e2e tests against the
+# resulting archive with the options of the sanitizers job in .github/workflows/ci.yaml.
+build:asan --@llvm//config:asan=true
+build:asan --@llvm//config:ubsan=true
+# GLib/GObject cast every class_init/base_init callback to GBaseInitFunc & co;
+# clang's -fsanitize=function reports each call.
+build:asan --copt=-fno-sanitize=function
+build:asan --copt=-fno-omit-frame-pointer
+build:asan --copt=-g1
+build:asan --strip=never
+
 # Test output settings
 test --test_summary=terse
 test --test_output=errors

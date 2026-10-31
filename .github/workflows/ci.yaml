@@ -48,6 +48,36 @@ jobs:
           bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
 
+  sanitizers:
+    # ASan + LSan + UBSan: the linux_amd64 archive built with --config=asan
+    # (dnf5 and every C/C++ dependency instrumented), and e2e/smoke_test run
+    # against it. Third-party findings that are not ours to fix go into
+    # sanitizers/*.supp, each with its reason. The rpm_lock and rpm_mark build
+    # actions do not see --test_env: ASan and LSan fail them by default, UBSan
+    # only reports there; the tests that run dnf5 themselves halt on it.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bazel
+        with:
+          buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+      - name: Build the sanitized archive
+        run: |
+          version=$(sed -n 's/^DNF5_VERSION = "\(.*\)"$/\1/p' bazel/extensions.bzl)
+          bazel --bazelrc=.github/workflows/ci.bazelrc build --config=linux_amd64 --config=asan //bazel/release:dnf5
+          mkdir -p dist
+          cp -L bazel-bin/bazel/release/dnf5.tar.gz "dist/dnf5-${version}-linux_amd64.tar.gz"
+      - name: e2e under ASan + LSan + UBSan
+        working-directory: e2e/smoke_test
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+          --test_env=ASAN_OPTIONS=detect_leaks=1:detect_stack_use_after_return=1:print_summary=1
+          --test_env=LSAN_OPTIONS=suppressions=${{ github.workspace }}/sanitizers/lsan.supp:print_suppressions=0
+          --test_env=UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=${{ github.workspace }}/sanitizers/ubsan.supp
+          --test_output=errors
+
   buildifier:
     runs-on: ubuntu-24.04
     steps:

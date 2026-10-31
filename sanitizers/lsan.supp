@@ -1,0 +1,2 @@
+# LSan suppressions (LSAN_OPTIONS=suppressions=...): third-party leaks only, each
+# with the reason. Nothing from this repository is suppressed.
