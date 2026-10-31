@@ -185,8 +185,7 @@ def dnf5_script(dnf5, info, command, path_of):
     return """#!/usr/bin/env bash
 set -euo pipefail
 
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "${TMP_DIR}"' EXIT
+TMP_DIR="${PWD}/tmp"
 mkdir -p "${TMP_DIR}/root"
 
 PREAMBLE=()
