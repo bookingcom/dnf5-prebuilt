@@ -1,0 +1,20 @@
+load("@aspect_rules_py//py:defs.bzl", "py_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "rpm_lock.py",
+    "rpm_mark.py",
+])
+
+py_binary(
+    name = "rpm_lock",
+    srcs = ["rpm_lock.py"],
+    main = "rpm_lock.py",
+)
+
+py_binary(
+    name = "rpm_mark",
+    srcs = ["rpm_mark.py"],
+    main = "rpm_mark.py",
+)
