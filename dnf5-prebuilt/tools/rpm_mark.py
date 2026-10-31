@@ -286,6 +286,9 @@ def main():
         "--nodeps",
         "--noscripts",
         "--nosignature",
+        "--ignorearch",
+        "--ignoreos",
+        "--ignoresize",
         *rpm_files,
     ]
     res = subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
