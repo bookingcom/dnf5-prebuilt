@@ -4,9 +4,17 @@ exports_files([
     "ol9_repo/curl-7.76.1-40.el9_8.8.x86_64.rpm",
     "ol9_repo/libcurl-7.76.1-40.el9_8.8.x86_64.rpm",
     "ol9_repo/ol9.repo",
+    "repo/mystery-devel-19.67-1.noarch.rpm",
+    "repo/tour-4-6.noarch.rpm",
+    "test.repo",
 ])
 
 filegroup(
     name = "ol9_repo_files",
     srcs = glob(["ol9_repo/**"]),
+)
+
+filegroup(
+    name = "test_repo_files",
+    srcs = glob(["repo/**"]),
 )

@@ -1,4 +1,5 @@
-load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_mark")
+load("@aspect_rules_py//py:defs.bzl", "py_test")
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_lock", "rpm_mark")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 DNF5 = "@dnf5-prebuilt//dnf5-prebuilt:current_toolchain"
@@ -125,5 +126,70 @@ rpm_mark(
     base_rpmdb = ":ol9_base_rpmdb",
     rpms = [
         "//testdata:ol9_repo/curl-7.76.1-40.el9_8.8.x86_64.rpm",
+    ],
+)
+
+rpm_mark(
+    name = "mystery_base_rpmdb",
+    rpms = [
+        "//testdata:repo/mystery-devel-19.67-1.noarch.rpm",
+    ],
+)
+
+# --- rpm_lock ---------------------------------------------------------------
+
+# Single-layer solve: resolves tour and its required dependency mystery-devel
+rpm_lock(
+    name = "test_tour_lock",
+    out = "test_tour_lock.lock.json",
+    arch = [
+        "x86_64",
+        "noarch",
+    ],
+    packages = ["tour"],
+    releasever = "9",
+    repo_configs = ["//testdata:test.repo"],
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+# Multi-layer solve: resolves tour on top of mystery_base_rpmdb (which already contains mystery-devel)
+rpm_lock(
+    name = "test_layered_lock",
+    out = "test_layered_lock.lock.json",
+    arch = [
+        "x86_64",
+        "noarch",
+    ],
+    base_rpmdb = ":mystery_base_rpmdb",
+    packages = ["tour"],
+    releasever = "9",
+    repo_configs = ["//testdata:test.repo"],
+    repo_files = ["//testdata:test_repo_files"],
+)
+
+py_test(
+    name = "rpm_lock_test",
+    srcs = ["test_lock.py"],
+    args = [
+        "$(rootpath :test_tour_lock.lock.json)",
+        "$(rootpath :test_layered_lock.lock.json)",
+    ],
+    data = [
+        ":test_layered_lock.lock.json",
+        ":test_tour_lock.lock.json",
+    ],
+)
+
+sh_test(
+    name = "lock_run_test",
+    srcs = ["test_lock_run.sh"],
+    args = [
+        "test_tour_lock_run.sh",
+        "$(rootpath :test_tour_lock.lock.json)",
+        "test_tour_lock.lock.json",
+    ],
+    data = [
+        ":test_tour_lock",
+        ":test_tour_lock.lock.json",
     ],
 )

@@ -1,0 +1,29 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[manifest]
+
+[[manifest.dependency-metadata]]
+name = "repomd"
+version = "0.2.1"
+
+[[package]]
+name = "dnf5-prebuilt"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "repomd" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "repomd", specifier = "==0.2.1" }]
+
+[[package]]
+name = "repomd"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/ef/47155c061ac6cbdaa9b12f236474bb40f09a044f7ecb9d66d00d29a61496/repomd-0.2.1.tar.gz", hash = "sha256:30bd9c329ba465e5b6c5e14ab008260c53fac61e138040b34b19489f3971d7aa", size = 7729, upload-time = "2019-03-25T16:10:55.697Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/86/eaf3c0a16e6e25d97bc0cdefc200e02bf26dcf9e61eb8f7bedfbabffe47e/repomd-0.2.1-py3-none-any.whl", hash = "sha256:6e286a96fbde45c74e0dee5b2a57dece9b9e47798ded2f0e2d164570c81eda65", size = 3945, upload-time = "2019-03-25T16:10:54.73Z" },
+]
