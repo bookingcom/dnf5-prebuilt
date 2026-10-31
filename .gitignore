@@ -16,6 +16,8 @@ release_assets/
 !*.patch
 !e2e/smoke_test/testdata/ol9_repo/repodata/
 !e2e/smoke_test/testdata/ol9_repo/repodata/**
+!e2e/smoke_test/testdata/repo/repodata/
+!e2e/smoke_test/testdata/repo/repodata/**
 /e2e/*/bazel-*
 /e2e/*/MODULE.bazel.lock
 __pycache__/

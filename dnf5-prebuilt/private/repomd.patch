@@ -1,0 +1,58 @@
+--- a/repomd.py
++++ b/repomd.py
+@@ -1,7 +1,7 @@
+ import datetime
+ import gzip
+ import io
+-import defusedxml.lxml
++import xml.etree.ElementTree as ET
+ import pathlib
+ import urllib.request
+ import urllib.parse
+@@ -15,6 +15,11 @@
+ 
+ 
+ def load(baseurl):
++    baseurl_str = str(baseurl)
++    if not urllib.parse.urlparse(baseurl_str).scheme:
++        baseurl = pathlib.Path(baseurl_str).resolve().as_uri()
++    else:
++        baseurl = baseurl_str
+     # parse baseurl to allow manipulating the path
+     base = urllib.parse.urlparse(baseurl)
+     path = pathlib.PurePosixPath(base.path)
+@@ -25,7 +30,7 @@
+ 
+     # download and parse repomd.xml
+     with urllib.request.urlopen(repomd_url) as response:
+-        repomd_xml = defusedxml.lxml.fromstring(response.read())
++        repomd_xml = ET.fromstring(response.read())
+ 
+     # determine the location of *primary.xml.gz
+     primary_element = repomd_xml.find('repo:data[@type="primary"]/repo:location', namespaces=_ns)
+@@ -36,7 +41,7 @@
+     with urllib.request.urlopen(primary_url) as response:
+         with io.BytesIO(response.read()) as compressed:
+             with gzip.GzipFile(fileobj=compressed) as uncompressed:
+-                metadata = defusedxml.lxml.fromstring(uncompressed.read())
++                metadata = ET.fromstring(uncompressed.read())
+ 
+     return Repo(baseurl, metadata)
+ 
+@@ -131,6 +136,16 @@
+         return self._element.find('common:location', namespaces=_ns).get('href')
+ 
+     @property
++    def checksum(self):
++        chk = self._element.find('common:checksum', namespaces=_ns)
++        return chk.text.strip() if chk is not None and chk.text else None
++
++    @property
++    def checksum_type(self):
++        chk = self._element.find('common:checksum', namespaces=_ns)
++        return chk.get('type') if chk is not None else None
++
++    @property
+     def _version_info(self):
+         return self._element.find('common:version', namespaces=_ns)
+ 

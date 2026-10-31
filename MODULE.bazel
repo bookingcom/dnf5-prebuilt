@@ -171,3 +171,17 @@ register_toolchains(
     "@python_interpreters//:all",
     dev_dependency = True,
 )
+
+uv = use_extension("@aspect_rules_py//uv:extensions.bzl", "uv")
+uv.declare_hub(hub_name = "uv")
+uv.project(
+    name = "dnf5",
+    hub_name = "uv",
+    lock = "//:uv.lock",
+    pyproject = "//:pyproject.toml",
+)
+uv.override_package(
+    name = "repomd",
+    post_install_patches = ["//dnf5-prebuilt/private:repomd.patch"],
+)
+use_repo(uv, "uv")
