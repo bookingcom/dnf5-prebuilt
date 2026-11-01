@@ -4,7 +4,7 @@ load("//dnf5-prebuilt/private:config.bzl", "DNF5_TOOLCHAIN")
 
 def _rpm_mark_impl(ctx):
     """Writes the rpmdb file with rpm_mark."""
-    out = ctx.actions.declare_file(ctx.label.name)
+    out = ctx.outputs.out or ctx.actions.declare_file(ctx.label.name + "/rpmdb.sqlite")
     dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
 
     args = ctx.actions.args()
@@ -35,6 +35,9 @@ rpm_mark = rule(
         "base_rpmdb": attr.label(
             allow_single_file = True,
             doc = "Optional base rpmdb file to mark packages on top of.",
+        ),
+        "out": attr.output(
+            doc = "Optional output file. Defaults to <name>/rpmdb.sqlite.",
         ),
         "rpms": attr.label_list(
             mandatory = True,

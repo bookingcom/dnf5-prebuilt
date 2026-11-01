@@ -12,6 +12,16 @@ exports_files(
 )
 
 py_binary(
+    name = "tar_dedup",
+    srcs = ["tar_dedup.py"],
+)
+
+py_binary(
+    name = "tar_inject_rpmdb",
+    srcs = ["tar_inject_rpmdb.py"],
+)
+
+py_binary(
     name = "rpm_mark",
     srcs = ["rpm_mark.py"],
 )
@@ -22,5 +32,6 @@ py_binary(
     dep_group = "dnf5-prebuilt",
     deps = [
         "@uv//repomd:pkg",
+        "@uv//zstandard:pkg",
     ],
 )

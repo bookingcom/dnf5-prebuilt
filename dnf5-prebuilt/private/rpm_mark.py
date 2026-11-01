@@ -35,6 +35,8 @@ def main():
         rpm_bin,
         "--dbpath", stage_dir,
         "--install",
+        "--replacefiles",
+        "--replacepkgs",
         "--verbose",
         "--hash",
         "--justdb",

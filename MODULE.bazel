@@ -9,10 +9,13 @@ bazel_dep(name = "platforms", version = "1.1.0")
 
 bazel_dep(name = "platforms_contrib", version = "1.0.0-alpha.0", dev_dependency = True)
 bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
-bazel_dep(name = "bazel_lib", version = "3.7.2", dev_dependency = True)
+
+bazel_dep(name = "bazel_lib", version = "3.7.2")
+
 bazel_dep(name = "rules_cc", version = "0.2.26", dev_dependency = True)
 bazel_dep(name = "rules_shell", version = "0.8.0", dev_dependency = True)
-bazel_dep(name = "tar.bzl", version = "0.10.9", dev_dependency = True)
+
+bazel_dep(name = "tar.bzl", version = "0.10.9")
 
 # Hermetic LLVM C/C++ toolchain from BCR
 bazel_dep(name = "llvm", version = "0.8.26", dev_dependency = True)
@@ -182,6 +185,9 @@ uv.project(
 )
 uv.override_package(
     name = "repomd",
-    post_install_patches = ["//dnf5-prebuilt/private:repomd.patch"],
+    post_install_patches = [
+        "//dnf5-prebuilt/private:repomd.patch",
+        "//dnf5-prebuilt/private:repomd_compression.patch",
+    ],
 )
 use_repo(uv, "uv")

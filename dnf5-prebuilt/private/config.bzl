@@ -74,6 +74,9 @@ SOLVER_ATTRS = {
         mandatory = True,
         doc = "Distribution release version (--releasever), e.g. '9'.",
     ),
+    "vars": attr.string_dict(
+        doc = "Custom variables to pass to dnf5 (--setvar=NAME=VALUE).",
+    ),
 }
 
 def solver_settings(attr):
@@ -100,7 +103,8 @@ def render_dnf_config(
         install_weak_deps = True,
         excludepkgs = [],
         module_platform_id = "",
-        module_enable = []):
+        module_enable = [],
+        vars = {}):
     """Renders dnf.conf, the repos.d files and preamble.args under <prefix>/.
 
     Args:
@@ -116,6 +120,7 @@ def render_dnf_config(
       excludepkgs: NEVRA globs hidden from the solver.
       module_platform_id: platform module that module streams are resolved against.
       module_enable: module streams (NAME:STREAM) to enable.
+      vars: custom variables to pass via --setvar.
 
     Returns:
       A DnfConfigInfo.
@@ -157,6 +162,8 @@ def render_dnf_config(
     preamble = list(DNF5_PREAMBLE) + ["--releasever=" + releasever]
     if forcearch:
         preamble.append("--forcearch=" + forcearch)
+    for k, v in vars.items():
+        preamble.append("--setvar=%s=%s" % (k, v))
 
     args_file = ctx.actions.declare_file(prefix + "/preamble.args")
     ctx.actions.write(args_file, "".join([a + "\n" for a in preamble]))
@@ -175,6 +182,7 @@ def render_dnf_config(
         repo_dir_short = _repo_dir(repo_files, lambda f: f.short_path),
         repo_files = repo_files,
         repos = repos,
+        vars = vars,
     )
 
 def dnf5_script(dnf5, info, command, path_of):
