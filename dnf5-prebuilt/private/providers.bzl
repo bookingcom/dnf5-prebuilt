@@ -25,5 +25,6 @@ DnfConfigInfo = provider(
         "repo_dir_short": "Runfiles-relative directory of the local repository",
         "repo_files": "List of the local repository files (repodata and packages)",
         "repos": "List of rendered .repo files",
+        "vars": "Dictionary of variables passed as --setvar",
     },
 )

@@ -5,6 +5,7 @@ description = "Prebuilt dnf5 and hermetic Bazel packaging tools"
 requires-python = ">=3.10"
 dependencies = [
     "repomd==0.2.1",
+    "zstandard>=0.22.0",
 ]
 
 [[tool.uv.dependency-metadata]]

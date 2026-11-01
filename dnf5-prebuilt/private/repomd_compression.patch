@@ -1,0 +1,84 @@
+--- a/repomd.py
++++ b/repomd.py
+@@ -1,7 +1,10 @@
+ import datetime
+ import gzip
+ import io
++import lzma
++import os
+ import xml.etree.ElementTree as ET
++import zstandard
+ import pathlib
+ import urllib.request
+ import urllib.parse
+@@ -14,6 +17,57 @@
+ }
+ 
+ 
++def _decompress_bytes(content, filename=""):
++    if filename.endswith(".zst"):
++        return zstandard.ZstdDecompressor().decompress(content)
++    if filename.endswith(".gz"):
++        with io.BytesIO(content) as bio:
++            with gzip.GzipFile(fileobj=bio) as gz:
++                return gz.read()
++    if filename.endswith(".xz"):
++        return lzma.decompress(content)
++    return content
++
++
++def _open_decompressed(path):
++    if path.endswith(".zst"):
++        return zstandard.ZstdDecompressor().stream_reader(open(path, "rb"))
++    if path.endswith(".gz"):
++        return gzip.open(path, "rb")
++    if path.endswith(".xz"):
++        return lzma.open(path, "rb")
++    return open(path, "rb")
++
++
++def load_cache(cache_dir):
++    checksum_map = {}
++    if not os.path.isdir(cache_dir):
++        return checksum_map
++    for root, _, files in os.walk(cache_dir):
++        for f in files:
++            if "primary.xml" in f:
++                p = os.path.join(root, f)
++                try:
++                    stream = _open_decompressed(p)
++                    for event, elem in ET.iterparse(stream, events=("end",)):
++                        if elem.tag.endswith("package"):
++                            chk_elem = elem.find("{http://linux.duke.edu/metadata/common}checksum")
++                            loc_elem = elem.find("{http://linux.duke.edu/metadata/common}location")
++                            name_elem = elem.find("{http://linux.duke.edu/metadata/common}name")
++                            if chk_elem is not None and loc_elem is not None:
++                                chk = chk_elem.text
++                                loc = loc_elem.attrib.get("href", "")
++                                pkg_name = name_elem.text if name_elem is not None else ""
++                                checksum_map[loc] = (chk, pkg_name)
++                                checksum_map[os.path.basename(loc)] = (chk, pkg_name)
++                            elem.clear()
++                    if hasattr(stream, "close"):
++                        stream.close()
++                except Exception:
++                    pass
++    return checksum_map
++
++
+ def load(baseurl):
+     baseurl_str = str(baseurl)
+     if not urllib.parse.urlparse(baseurl_str).scheme:
+@@ -39,9 +93,9 @@
+ 
+     # download and parse *-primary.xml
+     with urllib.request.urlopen(primary_url) as response:
+-        with io.BytesIO(response.read()) as compressed:
+-            with gzip.GzipFile(fileobj=compressed) as uncompressed:
+-                metadata = ET.fromstring(uncompressed.read())
++        content = response.read()
++        decompressed = _decompress_bytes(content, primary_element.get("href", ""))
++        metadata = ET.fromstring(decompressed)
+ 
+     return Repo(baseurl, metadata)
+ 

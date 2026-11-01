@@ -31,6 +31,7 @@ def parse_args():
     parser.add_argument("--module-platform-id", help="Platform module ID")
     parser.add_argument("--prune", action="append", default=[], help="Packages to prune")
     parser.add_argument("--exclude", "--excludepkgs", action="append", dest="excludepkgs", default=[], help="NEVRA globs to exclude")
+    parser.add_argument("--setvar", action="append", default=[], help="Variable definitions NAME=VALUE")
     parser.add_argument("--base-rpmdb", help="Path to base rpmdb.sqlite")
     parser.add_argument("--reposdir", required=True, help="Path to repos.d")
     parser.add_argument("--repo-dir", help="Path to repo directory")
@@ -74,7 +75,7 @@ def load_checksums_from_repomd(repos_dir, repo_dir_var):
 
 def parse_repoquery_output(output):
     """Parses dnf5 repoquery --queryformat records."""
-    packages = {}
+    packages = []
     records = output.split("---RECORD_END---")
     for rec in records:
         rec = rec.strip()
@@ -136,7 +137,7 @@ def parse_repoquery_output(output):
                 pkg_data[current_field].append(line_s)
 
         if pkg_data["name"]:
-            packages[pkg_data["name"]] = pkg_data
+            packages.append(pkg_data)
 
     return packages
 
@@ -202,6 +203,8 @@ def main():
             ])
             if repo_dir_abs:
                 dnf5_base.append(f"--setvar=repo_dir={repo_dir_abs}")
+            for sv in args.setvar:
+                dnf5_base.append(f"--setvar={sv}")
             if args.forcearch:
                 dnf5_base.append(f"--forcearch={args.forcearch}")
             else:
@@ -222,6 +225,10 @@ def main():
 
         # Resolve packages via dnf5 download --url --resolve
         dl_cmd = list(dnf5_base) + ["download", "--url", "--resolve"]
+        for a in args.arch.split(","):
+            a = a.strip()
+            if a:
+                dl_cmd.append(f"--arch={a}")
         if not args.base_rpmdb:
             dl_cmd.append("--alldeps")
         dl_cmd.extend(args.packages)
@@ -237,12 +244,28 @@ def main():
             if l.strip() and not l.startswith("Updating") and not l.startswith("Repositories loaded")
         ]
 
-        # Query metadata for all packages in the repository
+        # Target specific packages in repoquery to avoid querying entire repo
+        query_targets = list(args.packages)
+        for u in resolved_urls:
+            base = os.path.basename(u)
+            if base.endswith(".rpm"):
+                base = base[:-4]
+            if "." in base:
+                base = base.rsplit(".", 1)[0]
+            if "-" in base:
+                parts = base.split("-")
+                if len(parts) >= 3:
+                    pname = "-".join(parts[:-2])
+                    if pname not in query_targets:
+                        query_targets.append(pname)
+        if not query_targets:
+            query_targets = ["*"]
+
+        # Query metadata for all resolved packages
         q_cmd = list(dnf5_base) + [
             "-q", "repoquery",
             "--queryformat=NAME:%{name}\nVERSION:%{version}\nRELEASE:%{release}\nEPOCH:%{epoch}\nEVR:%{evr}\nARCH:%{arch}\nNEVRA:%{name}-%{evr}.%{arch}\nLOCATION:%{location}\nREPOID:%{repoid}\nREQUIRES:\n%{regular_requires}\nPROVIDES:\n%{provides}\nRECOMMENDS:\n%{recommends}\n---RECORD_END---",
-            "*"
-        ]
+        ] + query_targets
         res_q = subprocess.run(q_cmd, capture_output=True, text=True)
         if res_q.returncode != 0:
             sys.stderr.write(f"dnf5 repoquery failed:\n{res_q.stderr}\n")
@@ -253,17 +276,19 @@ def main():
         # Filter to only packages selected by download --url
         resolved_pkgs = {}
         resolved_urls_map = {}
-        for pkg_name, pkg in all_pkgs.items():
+        for pkg in all_pkgs:
             loc = pkg["location"]
             base_loc = os.path.basename(loc)
             for u in resolved_urls:
                 if u == loc or u.endswith("/" + loc) or u == base_loc or u.endswith("/" + base_loc):
-                    resolved_pkgs[pkg_name] = pkg
-                    resolved_urls_map[pkg_name] = u
+                    resolved_pkgs[pkg["name"]] = pkg
+                    resolved_urls_map[pkg["name"]] = u
                     break
 
-        # Load checksums via repomd
-        checksum_map = load_checksums_from_repomd(args.reposdir, repo_dir_abs)
+        # Load checksums: cachedir primary.xml first via repomd, repomd.load fallback
+        checksum_map = repomd.load_cache(os.path.join(tmp_dir, "cache"))
+        if not checksum_map:
+            checksum_map = load_checksums_from_repomd(args.reposdir, repo_dir_abs)
 
         # Build dependency graph
         dep_graph = {}
