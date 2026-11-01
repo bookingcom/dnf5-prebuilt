@@ -49,6 +49,31 @@ jobs:
         run: >
           bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Load container image into Docker
+        if: runner.os == 'Linux'
+        working-directory: e2e/smoke_test
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc run //:load_ol9_curl_image
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Validate container execution offline
+        if: runner.os == 'Linux'
+        working-directory: e2e/smoke_test
+        run: ./validate_image.sh localhost/e2e-curl-test:latest
+      - name: Collect artifacts
+        if: runner.os == 'Linux' && always()
+        run: |
+          mkdir -p artifacts
+          cp -f e2e/smoke_test/bazel-bin/*.lock.json artifacts/ || true
+          cp -f e2e/smoke_test/bazel-bin/*rpmdb*.sqlite artifacts/ || true
+          docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
+          ls -la artifacts/
+      - name: Upload e2e artifacts
+        if: runner.os == 'Linux' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: artifacts/
+          if-no-files-found: warn
 
   sanitizers:
     # ASan + LSan + UBSan: the linux_amd64 archive built with --config=asan

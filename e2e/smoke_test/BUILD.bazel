@@ -1,6 +1,107 @@
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_layer", "rpm_lock", "rpm_mark")
+load("@rules_img//img:image.bzl", "image_manifest")
+load("@rules_img//img:layer.bzl", "layer_from_tar")
+load("@rules_img//img:load.bzl", "image_load")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(
+    ":image_rpm.bzl",
+    "centos_stream_9_environment",
+    "oraclelinux_10_environment",
+    "oraclelinux_9_environment",
+)
 
+# Extract rpmdb and repository configurations from container images.
+oraclelinux_9_environment(name = "ol9")
+
+oraclelinux_10_environment(name = "ol10")
+
+centos_stream_9_environment(name = "centos9")
+
+# Generate lock files resolving packages on top of the image rpmdb.
+rpm_lock(
+    name = "ol9_curl_lock",
+    base_rpmdb = ":ol9_rpmdb",
+    config = ":ol9_dnf_config",
+    packages = ["curl"],
+)
+
+rpm_lock(
+    name = "ol10_lock",
+    base_rpmdb = ":ol10_rpmdb",
+    config = ":ol10_dnf_config",
+    packages = ["curl"],
+)
+
+rpm_lock(
+    name = "centos9_lock",
+    base_rpmdb = ":centos9_rpmdb",
+    config = ":centos9_dnf_config",
+    packages = ["jq"],
+)
+
+# Test that generated lock files contain valid package entries, URLs, and sha256 checksums.
 sh_test(
-    name = "placeholder_test",
-    srcs = ["placeholder_test.sh"],
+    name = "test_generated_locks",
+    srcs = ["run_lock_test.sh"],
+    args = [
+        "$(rootpath :ol9_curl_lock)",
+        "$(rootpath :ol10_lock)",
+        "$(rootpath :centos9_lock)",
+    ],
+    data = [
+        "test_lock_generated.py",
+        ":centos9_lock",
+        ":ol10_lock",
+        ":ol9_curl_lock",
+    ],
+)
+
+# Mark curl and libcurl RPMs as installed on top of the OL9 base rpmdb.
+rpm_mark(
+    name = "ol9_curl_rpmdb",
+    base_rpmdb = ":ol9_rpmdb",
+    rpms = [
+        "@ol9_libcurl_rpm//file",
+        "@ol9_curl_rpm//file",
+    ],
+)
+
+# Package RPM binaries and the updated rpmdb into an OCI layer tarball using public rpm_layer rule.
+rpm_layer(
+    name = "ol9_curl_layer_tar",
+    rpmdb = ":ol9_curl_rpmdb",
+    rpms = [
+        "@ol9_libcurl_rpm//file",
+        "@ol9_curl_rpm//file",
+    ],
+)
+
+# Build OCI layer and image manifest with the new layer.
+layer_from_tar(
+    name = "ol9_curl_layer",
+    src = ":ol9_curl_layer_tar",
+)
+
+image_manifest(
+    name = "ol9_curl_image",
+    base = "@oraclelinux_9_slim//:image",
+    layers = [":ol9_curl_layer"],
+)
+
+# Target to load the image into the local Docker daemon.
+image_load(
+    name = "load_ol9_curl_image",
+    image = ":ol9_curl_image",
+    tag = "localhost/e2e-curl-test:latest",
+)
+
+# Test container execution without network access.
+sh_test(
+    name = "validate_image_offline",
+    srcs = ["validate_image.sh"],
+    args = ["localhost/e2e-curl-test:latest"],
+    tags = [
+        "local",
+        "manual",
+    ],
 )

@@ -1,4 +1,6 @@
 # Test unreleased archives: --repo_env=DNF5_PREBUILT_DIST_DIR=<dir with dnf5-<version>-<platform>.tar.gz>
 common --enable_bzlmod
+common --registry=https://bazel-contrib.github.io/rules_img
+common --registry=https://bcr.bazel.build
 test --test_output=errors
 try-import %workspace%/.bazelrc.user
