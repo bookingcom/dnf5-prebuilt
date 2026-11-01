@@ -1,4 +1,4 @@
-"""Uses the public API of dnf5-prebuilt like a consumer would."""
+"""E2E tests for dnf5-prebuilt public API and container integration."""
 
 module(name = "smoke_test")
 
@@ -9,11 +9,75 @@ local_path_override(
 )
 
 bazel_dep(name = "bazel_lib", version = "3.7.2")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "aspect_rules_py", version = "2.0.0-alpha.10")
+bazel_dep(name = "rules_containers_util", version = "0.0.2")
+archive_override(
+    module_name = "rules_containers_util",
+    integrity = "sha256-3RBKgT/7gTJivQ+0SK+oLXPz9YHMxCg15Qq/BLblLVE=",
+    strip_prefix = "rules_containers_util-0.0.2",
+    urls = ["https://github.com/bookingcom/rules_containers_util/releases/download/v0.0.2/rules_containers_util-v0.0.2.tar.gz"],
+)
+
+bazel_dep(name = "rules_img", version = "0.3.24-20261029-189a6a2")
+bazel_dep(name = "tar.bzl", version = "0.10.9")
 
 dnf5 = use_extension("@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl", "dnf5")
 dnf5.toolchains()
 use_repo(dnf5, "dnf5_toolchains")
 
 register_toolchains("@dnf5_toolchains//:all")
+
+bsd_tar_toolchains = use_extension("@tar.bzl//tar:extensions.bzl", "toolchains")
+use_repo(bsd_tar_toolchains, "bsd_tar_toolchains")
+
+register_toolchains("@bsd_tar_toolchains//:all")
+
+pull = use_repo_rule("@rules_img//img:pull.bzl", "pull")
+
+pull(
+    name = "oraclelinux_9_slim",
+    layer_handling = "eager",
+    platforms = ["linux/amd64"],
+    registry = "index.docker.io",
+    repository = "library/oraclelinux",
+    tag = "9-slim",
+    unsafe_allow_tag_without_digest = True,
+)
+
+pull(
+    name = "oraclelinux_10_slim",
+    layer_handling = "eager",
+    platforms = ["linux/amd64"],
+    registry = "index.docker.io",
+    repository = "library/oraclelinux",
+    tag = "10-slim",
+    unsafe_allow_tag_without_digest = True,
+)
+
+pull(
+    name = "centos_stream_9",
+    layer_handling = "eager",
+    platforms = ["linux/amd64"],
+    registry = "quay.io",
+    repository = "centos/centos",
+    tag = "stream9",
+    unsafe_allow_tag_without_digest = True,
+)
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "ol9_curl_rpm",
+    downloaded_file_path = "curl-7.76.1-40.el9_8.9.x86_64.rpm",
+    sha256 = "7300400c68f72c78650a0d76cf233deb8860a32771c5b0bb8bc4ee509ac6bb22",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/curl-7.76.1-40.el9_8.9.x86_64.rpm"],
+)
+
+http_file(
+    name = "ol9_libcurl_rpm",
+    downloaded_file_path = "libcurl-7.76.1-40.el9_8.9.x86_64.rpm",
+    sha256 = "a522b6ab35fe1118a580537a375ab4f9d41f94b00411497f1d6cdb5e35353dfd",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/libcurl-7.76.1-40.el9_8.9.x86_64.rpm"],
+)
