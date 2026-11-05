@@ -94,7 +94,7 @@ jobs:
       - name: Build the sanitized archive
         run: |
           version=$(sed -n 's/^DNF5_VERSION = "\(.*\)"$/\1/p' bazel/extensions.bzl)
-          bazel --bazelrc=.github/workflows/ci.bazelrc build --config=linux_amd64 --config=asan //bazel/release:dnf5
+          bazel --bazelrc=.github/workflows/ci.bazelrc build -c opt --config=linux_amd64 --config=asan //bazel/release:dnf5
           mkdir -p dist
           cp -L bazel-bin/bazel/release/dnf5.tar.gz "dist/dnf5-${version}-linux_amd64.tar.gz"
       - name: e2e under ASan + LSan + UBSan
