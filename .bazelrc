@@ -82,6 +82,11 @@ build:asan --copt=-fno-sanitize=function
 build:asan --copt=-fno-omit-frame-pointer
 build:asan --copt=-g1
 build:asan --strip=never
+# -O1, as the sanitizer docs recommend, instead of fastbuild's default -O0: the
+# e2e rpm_lock actions ran ~10x slower than the -c opt archive (~980s vs ~100s
+# for ol9_curl_lock), which made the sanitizers job the critical path of CI.
+# Unlike -c opt it keeps assertions (no -DNDEBUG).
+build:asan --@llvm//config:fastbuild_optimization_mode=O1
 
 # Test output settings
 test --test_summary=terse
