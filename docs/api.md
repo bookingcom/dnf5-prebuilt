@@ -173,7 +173,7 @@ Rule that compresses an uncompressed tar archive using `bsdtar` with `gzip` or `
 ### `rpm_lock`
 
 ```starlark
-rpm_lock(name, packages, config = None, base_rpmdb = None, arch = ["x86_64", "noarch"], releasever = None, repo_configs = [], repo_files = [], exclude = [], out = None, ...)
+rpm_lock(name, packages, config = None, base_rpmdb = None, arch = ["x86_64", "noarch"], releasever = None, repo_configs = [], repo_files = [], rpms = [], exclude = [], out = None, ...)
 ```
 
 Rule and executable that resolves dependencies using `dnf5` and generates a hermetic JSON lockfile. Supports multi-layer dependency solving on top of an existing container `base_rpmdb`.
@@ -196,6 +196,7 @@ Running `bazel run <target>` updates the lockfile in the source tree.
 | `exclude` | `list of strings` | `[]` | Package names or NEVRA globs to exclude. |
 | `repo_configs` | `list of labels` | `[]` | `.repo` configuration files. |
 | `repo_files` | `list of labels` | `[]` | Repository metadata files (repodata XMLs). |
+| `rpms` | `list of labels` | `[]` | RPM files Bazel already fetched (e.g. from the previous lockfile). A resolved package whose file is here (same basename and checksum) is inspected for scriptlets from it instead of being downloaded again. |
 | `out` | `output` | `None` | Explicit output file. Defaults to `<name>.lock.json`. |
 
 #### Lockfile Schema
@@ -205,7 +206,6 @@ The generated JSON lockfile contains:
 - `arch`: Target architecture list.
 - `requested`: Array of requested package names.
 - `install_order`: Array of package names in topological installation order as dnf5/rpm would install them.
-- `order`: Alias for `install_order`.
 - `packages`: Array of package objects, each with:
   - `name`: Package name.
   - `version`: Version-release (EVR).

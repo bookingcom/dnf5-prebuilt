@@ -23,6 +23,11 @@ rpm_lock(
     base_rpmdb = ":ol9_rpmdb",
     config = ":ol9_dnf_config",
     packages = ["curl"],
+    # Reused for scriptlet inspection when they match the resolved builds; others are downloaded.
+    rpms = [
+        "@ol9_libcurl_rpm//file",
+        "@ol9_curl_rpm//file",
+    ],
 )
 
 rpm_lock(

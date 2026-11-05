@@ -62,9 +62,10 @@ def _rpm_lock_impl(ctx):
     args.add("--repo-dir=" + info.repo_dir)
     args.add("--dnf5=" + dnf5.dnf5.path)
     args.add("--rpm=" + dnf5.rpm.path)
+    args.add_all(ctx.files.rpms, format_each = "--local-rpm=%s")
     args.add_all(ctx.attr.packages)
 
-    inputs = []
+    inputs = list(ctx.files.rpms)
     if ctx.file.base_rpmdb:
         inputs.append(ctx.file.base_rpmdb)
 
@@ -111,6 +112,7 @@ def _rpm_lock_impl(ctx):
         run_args.append("--setvar=%s=%s" % (k, v))
     if ctx.file.base_rpmdb:
         run_args.append("--base-rpmdb=" + ctx.file.base_rpmdb.short_path)
+    run_args.extend(["--local-rpm=" + r.short_path for r in ctx.files.rpms])
     run_args.extend(ctx.attr.packages)
 
     tool_rel = ctx.executable._lock_tool.short_path
@@ -132,7 +134,7 @@ def _rpm_lock_impl(ctx):
         is_executable = True,
     )
 
-    runfiles_files = [out]
+    runfiles_files = [out] + ctx.files.rpms
     if ctx.file.base_rpmdb:
         runfiles_files.append(ctx.file.base_rpmdb)
 
@@ -182,6 +184,12 @@ _RPM_LOCK_ATTRS.update({
     ),
     "releasever": attr.string(
         doc = "Distribution release version (--releasever), e.g. '9'.",
+    ),
+    "rpms": attr.label_list(
+        allow_files = [".rpm"],
+        doc = "Optional RPM files Bazel already fetched, typically the repositories generated from the previous " +
+              "lockfile. A resolved package whose file is here (same basename and checksum) is inspected for " +
+              "scriptlets from it instead of being downloaded again.",
     ),
     "repo_configs": attr.label_list(
         allow_files = [".repo", ".conf"],

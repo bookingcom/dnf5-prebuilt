@@ -4,13 +4,13 @@
 import argparse
 import base64
 import configparser
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.parse
 
 import repomd
 
@@ -35,8 +35,25 @@ def parse_args():
     parser.add_argument("--base-rpmdb", help="Path to base rpmdb.sqlite")
     parser.add_argument("--reposdir", required=True, help="Path to repos.d")
     parser.add_argument("--repo-dir", help="Path to repo directory")
+    parser.add_argument(
+        "--local-rpm", action="append", default=[], help="RPM file already fetched by Bazel, reused if it matches"
+    )
     parser.add_argument("packages", nargs="+", help="Requested packages")
     return parser.parse_args()
+
+
+def lookup_checksum(checksum_map, location):
+    """Returns the repodata (checksum, name) of a package location, also matched by basename, or None."""
+    return checksum_map.get(location) or checksum_map.get(os.path.basename(location))
+
+
+def sha256_file(path):
+    """Returns the hex sha256 of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def load_checksums_from_repomd(repos_dir, repo_dir_var):
@@ -224,11 +241,8 @@ def main():
             subprocess.run(dnf5_base + ["module", "enable", "-y", mod], check=True, capture_output=True)
 
         # Resolve packages via dnf5 download --url --resolve
-        dl_cmd = list(dnf5_base) + ["download", "--url", "--resolve"]
-        for a in args.arch.split(","):
-            a = a.strip()
-            if a:
-                dl_cmd.append(f"--arch={a}")
+        arch_args = [f"--arch={a.strip()}" for a in args.arch.split(",") if a.strip()]
+        dl_cmd = list(dnf5_base) + ["download", "--url", "--resolve"] + arch_args
         if not args.base_rpmdb:
             dl_cmd.append("--alldeps")
         dl_cmd.extend(args.packages)
@@ -338,56 +352,67 @@ def main():
                 if os.path.isfile(local_path):
                     available_rpms[name] = local_path
 
-        missing_names = [n for n in resolved_pkgs if n not in available_rpms]
+        # RPMs Bazel already fetched (rpm_lock.rpms, e.g. the repositories of the previous lock) are reused when
+        # their basename and checksum match the resolved package, so a refresh downloads only what changed.
+        name_by_basename = {os.path.basename(pkg["location"]): name for name, pkg in resolved_pkgs.items()}
+        for local_rpm in args.local_rpm:
+            name = name_by_basename.get(os.path.basename(local_rpm))
+            if not name or name in available_rpms:
+                continue
+            chk_info = lookup_checksum(checksum_map, resolved_pkgs[name]["location"])
+            if chk_info and sha256_file(local_rpm) != chk_info[0]:
+                continue
+            available_rpms[name] = os.path.abspath(local_rpm)
+
+        missing_names = sorted(n for n in resolved_pkgs if n not in available_rpms)
         if missing_names:
             dl_dir = os.path.join(tmp_dir, "pkgs")
             os.makedirs(dl_dir, exist_ok=True)
-            dl_cmd = list(dnf5_base) + ["download", "--destdir=" + dl_dir]
-            for a in args.arch.split(","):
-                a = a.strip()
-                if a:
-                    dl_cmd.append(f"--arch={a}")
-            dl_cmd.extend(missing_names)
-            try:
-                subprocess.run(dl_cmd, capture_output=True, text=True, timeout=120)
-                for f in os.listdir(dl_dir):
-                    if f.endswith(".rpm"):
-                        fpath = os.path.join(dl_dir, f)
-                        for name, pkg in resolved_pkgs.items():
-                            if f == os.path.basename(pkg["location"]):
-                                available_rpms[name] = fpath
-            except Exception as e:
-                sys.stderr.write(f"Notice: downloading packages to inspect scriptlets failed: {e}\n")
+            dl_cmd = list(dnf5_base) + ["download", "--destdir=" + dl_dir] + arch_args
+            # By NEVRA, so that dnf5 fetches exactly the resolved build and not its own best candidate.
+            dl_cmd.extend(resolved_pkgs[n]["nevra"] for n in missing_names)
+            res_dl = subprocess.run(dl_cmd, capture_output=True, text=True)
+            if res_dl.returncode != 0:
+                sys.stderr.write(f"dnf5 download of packages to inspect scriptlets failed:\n{res_dl.stderr}\n")
+                sys.exit(res_dl.returncode)
+            for f in os.listdir(dl_dir):
+                name = name_by_basename.get(f)
+                if name:
+                    available_rpms[name] = os.path.join(dl_dir, f)
+
+        still_missing = sorted(n for n in resolved_pkgs if n not in available_rpms)
+        if still_missing:
+            sys.stderr.write(f"RPMs missing after download, cannot inspect scriptlets: {', '.join(still_missing)}\n")
+            sys.exit(1)
 
         dummy_db = os.path.join(tmp_dir, "dummy_db")
         os.makedirs(dummy_db, exist_ok=True)
-        for name, rpath in available_rpms.items():
-            try:
-                q_res = subprocess.run(
-                    [
-                        os.path.abspath(args.rpm),
-                        "--dbpath",
-                        dummy_db,
-                        "-qp",
-                        "--queryformat=%{PREIN}---SEP---%{POSTIN}",
-                        rpath,
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-                if q_res.returncode == 0 and "---SEP---" in q_res.stdout:
-                    pre, post = q_res.stdout.split("---SEP---", 1)
-                    has_pre = bool(pre.strip()) and pre.strip() != "(none)"
-                    has_post = bool(post.strip()) and post.strip() != "(none)"
-                    rpm_scripts_info[name] = (has_pre, has_post)
-            except Exception:
-                pass
+        for name, rpath in sorted(available_rpms.items()):
+            q_res = subprocess.run(
+                [
+                    os.path.abspath(args.rpm),
+                    "--dbpath",
+                    dummy_db,
+                    "-qp",
+                    "--queryformat=%{PREIN}---SEP---%{POSTIN}",
+                    rpath,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if q_res.returncode != 0 or "---SEP---" not in q_res.stdout:
+                sys.stderr.write(f"rpm -qp failed for {rpath}:\n{q_res.stderr}\n")
+                sys.exit(q_res.returncode or 1)
+            pre, post = q_res.stdout.split("---SEP---", 1)
+            has_pre = bool(pre.strip()) and pre.strip() != "(none)"
+            has_post = bool(post.strip()) and post.strip() != "(none)"
+            rpm_scripts_info[name] = (has_pre, has_post)
 
         output_packages = []
         for name in sorted_names:
             pkg = resolved_pkgs[name]
             loc = pkg["location"]
-            chk_info = checksum_map.get(loc) or checksum_map.get(os.path.basename(loc))
+            chk_info = lookup_checksum(checksum_map, loc)
             chk = chk_info[0] if chk_info else ""
             integrity = ("sha256-" + base64.b64encode(bytes.fromhex(chk)).decode()) if chk else ""
 
