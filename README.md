@@ -124,6 +124,8 @@ Notes:
 
 ## Guides and workflows
 
+- [Public API Reference](docs/api.md):
+  Documentation for all public rules, macros, providers, and toolchains (`rpm_layer`, `rpm_lock`, `rpm_mark`, `dnf_config`, `rpm_merge`, `tar_dedup`, `rpmdb_inject`, `tar_compress`).
 - [RPM Dependency Trees, URL Resolution, and Integrity Extraction](docs/rpm-dependency-resolution.md):
   Resolving dependency trees as JSON/ASCII, resolving package URLs in $O(1)$, and extracting SHA-256 integrity from repodata without Docker.
 - [Converting and Merging RPMs into OCI Tar Layers](docs/rpm-to-oci-layer.md):
