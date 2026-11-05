@@ -40,10 +40,10 @@ jobs:
         with:
           name: dnf5
           path: dist
-      - uses: bazel-contrib/setup-bazel@0.15.0
+      - uses: ./.github/actions/setup-bazel
         with:
-          bazelisk-cache: true
-          repository-cache: true
+          buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Smoke test
         working-directory: e2e/smoke_test
         run: >
@@ -85,6 +85,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: ./.github/actions/setup-bazel
         with:
           buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}

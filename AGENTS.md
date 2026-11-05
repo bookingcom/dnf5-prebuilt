@@ -18,6 +18,11 @@ is; this file records the rules and the non-obvious lessons.
 - **One commit per step** (e.g. one third-party library = registry entry +
   `MODULE.bazel` + `MODULE.bazel.lock` + its smoke test). Message ends with the
   attribution line required by the session.
+- **All tests in CI must run with BuildBuddy enabled.** Any test execution in
+  CI (including unit/smoke tests in root and e2e smoke tests in `e2e/smoke_test`,
+  such as the `sanitizers` and `e2e` jobs) must use
+  `.github/actions/setup-bazel` with BuildBuddy endpoints and API keys so remote
+  cache and BES invocation streaming are always active.
 - **Never publish org-internal references**; this repository is public
   (Apache-2.0). Do not use company-internal services from here.
 - **Do not delete or overwrite `.bazelrc.user`**: it is git-ignored and holds
