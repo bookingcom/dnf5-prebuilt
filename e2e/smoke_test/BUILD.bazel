@@ -10,6 +10,17 @@ load(
     "oraclelinux_9_environment",
 )
 
+# Pinned OL9 curl builds (MODULE.bazel), in install order: libcurl before curl.
+OL9_CURL_RPMS = [
+    "@ol9_libcurl_rpm//file",
+    "@ol9_curl_rpm//file",
+]
+
+OL9_CURL_AARCH64_RPMS = [
+    "@ol9_libcurl_aarch64_rpm//file",
+    "@ol9_curl_aarch64_rpm//file",
+]
+
 # Extract rpmdb and repository configurations from container images.
 oraclelinux_9_environment(name = "ol9")
 
@@ -24,10 +35,7 @@ rpm_lock(
     config = ":ol9_dnf_config",
     packages = ["curl"],
     # Reused for scriptlet inspection when they match the resolved builds; others are downloaded.
-    rpms = [
-        "@ol9_libcurl_rpm//file",
-        "@ol9_curl_rpm//file",
-    ],
+    rpms = OL9_CURL_RPMS,
 )
 
 rpm_lock(
@@ -65,10 +73,7 @@ sh_test(
 rpm_mark(
     name = "ol9_curl_rpmdb",
     base_rpmdb = ":ol9_rpmdb",
-    rpms = [
-        "@ol9_libcurl_rpm//file",
-        "@ol9_curl_rpm//file",
-    ],
+    rpms = OL9_CURL_RPMS,
 )
 
 # Package RPM binaries and the updated rpmdb into an OCI layer tarball using public rpm_layer rule.
@@ -76,10 +81,30 @@ rpm_layer(
     name = "ol9_curl_layer_tar",
     gpgcheck = True,
     rpmdb = ":ol9_curl_rpmdb",
-    rpms = [
-        "@ol9_libcurl_rpm//file",
-        "@ol9_curl_rpm//file",
-    ],
+    rpms = OL9_CURL_RPMS,
+)
+
+# Cross-architecture: aarch64 RPMs verified and merged on whatever host runs the build.
+rpm_mark(
+    name = "ol9_curl_aarch64_rpmdb",
+    base_rpmdb = ":ol9_rpmdb",
+    rpms = OL9_CURL_AARCH64_RPMS,
+)
+
+rpm_layer(
+    name = "ol9_curl_aarch64_layer_tar",
+    gpgcheck = True,
+    rpmdb = ":ol9_curl_aarch64_rpmdb",
+    rpms = OL9_CURL_AARCH64_RPMS,
+)
+
+# Negative case: no rpmdb and no keys, so verification must reject the signed RPMs (NOKEY).
+# Built by CI, which expects the build to fail; manual so that //... stays green.
+rpm_layer(
+    name = "ol9_curl_nokey_layer_tar",
+    gpgcheck = True,
+    rpms = ["@ol9_curl_rpm//file"],
+    tags = ["manual"],
 )
 
 # Build OCI layer and image manifest with the new layer.
