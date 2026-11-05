@@ -10,6 +10,11 @@ is; this file records the rules and the non-obvious lessons.
   get). It must not reference any other package of this repository nor any
   `dev_dependency` module; today it only uses `@platforms`. Everything else is
   private build infrastructure and every module it uses is a `dev_dependency`.
+- **Public API documentation.** All public rules, macros, providers, and
+  toolchains exposed in `dnf5-prebuilt/defs.bzl` (and module extensions in
+  `dnf5-prebuilt/extensions.bzl`) must be documented in `docs/api.md`. Whenever
+  a new public API is added or an existing signature/attribute is changed,
+  update `docs/api.md` to keep documentation in sync.
 - **One commit per step** (e.g. one third-party library = registry entry +
   `MODULE.bazel` + `MODULE.bazel.lock` + its smoke test). Message ends with the
   attribution line required by the session.
@@ -47,7 +52,7 @@ is; this file records the rules and the non-obvious lessons.
   `RPM_CONFIGDIR`, `DNF5_PLUGINS_DIR`, `pluginpath`, `pluginconfpath`,
   `sslcacert`.
 - `tools/any2bazel/`, `any2bazel.json` — parity with upstream CMake.
-- `docs/` — guides on [RPM dependency resolution and repodata integrity](docs/rpm-dependency-resolution.md) and [direct RPM-to-OCI layer merging with bsdtar](docs/rpm-to-oci-layer.md).
+- `docs/` — [Public API reference](docs/api.md), guides on [RPM dependency resolution and repodata integrity](docs/rpm-dependency-resolution.md) and [direct RPM-to-OCI layer merging with bsdtar](docs/rpm-to-oci-layer.md).
 
 ## Local registry (`bazel/3rdparty`)
 
