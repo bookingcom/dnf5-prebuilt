@@ -411,8 +411,6 @@ def main():
                     pkg_obj["has_preinstall_script"] = True
                 if has_post:
                     pkg_obj["has_postinstall_script"] = True
-            elif pkg.get("requires_pre"):
-                pkg_obj["has_preinstall_script"] = True
 
             if pkg["recommends"]:
                 pkg_obj["recommends"] = sorted(pkg["recommends"])
