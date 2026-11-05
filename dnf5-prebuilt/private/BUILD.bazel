@@ -1,4 +1,4 @@
-load("@aspect_rules_py//py:defs.bzl", "py_binary")
+load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_test")
 
 package(default_visibility = ["//dnf5-prebuilt:__subpackages__"])
 
@@ -39,6 +39,19 @@ py_binary(
 py_binary(
     name = "rpm_lock",
     srcs = ["rpm_lock.py"],
+    dep_group = "dnf5-prebuilt",
+    deps = [
+        "@uv//repomd:pkg",
+        "@uv//zstandard:pkg",
+    ],
+)
+
+# dnf5 and rpm are shell stubs, so this runs without network or a dnf5 toolchain.
+py_test(
+    name = "rpm_lock_test",
+    size = "small",
+    srcs = ["rpm_lock_test.py"],
+    data = ["rpm_lock.py"],
     dep_group = "dnf5-prebuilt",
     deps = [
         "@uv//repomd:pkg",

@@ -22,7 +22,7 @@ jobs:
       - name: Test
         run: >
           bazel --bazelrc=.github/workflows/ci.bazelrc test
-          --config=linux_amd64 -c opt //bazel/tests/...
+          --config=linux_amd64 -c opt //bazel/tests/... //dnf5-prebuilt/private/...
       - name: Build
         run: |
           mkdir -p dist
