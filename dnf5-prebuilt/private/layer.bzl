@@ -1,6 +1,7 @@
 """Implementation of the multi-pass rpm_layer rule and macro."""
 
 load("@bazel_lib//lib:utils.bzl", "propagate_common_rule_attributes")
+load("//dnf5-prebuilt/private:config.bzl", "DNF5_TOOLCHAIN")
 
 TAR_TOOLCHAIN_TYPE = "@tar.bzl//tar/toolchain:type"
 
@@ -8,6 +9,51 @@ def _rpm_merge_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ".tar"))
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
+
+    extra_inputs = []
+    if ctx.attr.gpgcheck:
+        keystore_dir = ctx.actions.declare_directory(ctx.label.name + "_gpg_keystore")
+        dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
+
+        ks_args = ctx.actions.args()
+        ks_args.add("--output", keystore_dir.path)
+        ks_inputs = []
+        if ctx.file.rpmdb:
+            ks_args.add("--rpmdb", ctx.file.rpmdb.path)
+            ks_inputs.append(ctx.file.rpmdb)
+        if ctx.files.gpg_keys:
+            for k in ctx.files.gpg_keys:
+                ks_args.add("--key", k.path)
+                ks_inputs.append(k)
+
+        ctx.actions.run(
+            mnemonic = "RpmGpgKeystore",
+            progress_message = "Creating GPG keystore for %s" % ctx.label.name,
+            executable = ctx.executable._keystore_tool,
+            arguments = [ks_args],
+            inputs = depset(ks_inputs),
+            outputs = [keystore_dir],
+            use_default_shell_env = True,
+        )
+
+        for rpm in ctx.files.rpms:
+            verified_marker = ctx.actions.declare_file(ctx.label.name + "_" + rpm.basename + ".gpg_verified")
+            v_args = ctx.actions.args()
+            v_args.add("--rpm-bin", dnf5.rpm.path)
+            v_args.add("--keystore", keystore_dir.path)
+            v_args.add("--rpm", rpm.path)
+            v_args.add("--output", verified_marker.path)
+
+            ctx.actions.run(
+                mnemonic = "RpmGpgVerify",
+                progress_message = "Verifying GPG signature for %s" % rpm.basename,
+                executable = ctx.executable._verify_tool,
+                arguments = [v_args],
+                inputs = depset([rpm, keystore_dir], transitive = [dnf5.files]),
+                outputs = [verified_marker],
+                use_default_shell_env = True,
+            )
+            extra_inputs.append(verified_marker)
 
     args = ctx.actions.args()
     args.add("-cf", out)
@@ -23,7 +69,7 @@ def _rpm_merge_impl(ctx):
         progress_message = "Merging RPMs into uncompressed archive %s" % out.short_path,
         executable = bsdtar,
         arguments = [args],
-        inputs = depset(ctx.files.rpms, transitive = [tar_toolchain.default.files]),
+        inputs = depset(ctx.files.rpms + extra_inputs, transitive = [tar_toolchain.default.files]),
         outputs = [out],
         env = tar_toolchain.tarinfo.default_env,
     )
@@ -33,14 +79,36 @@ rpm_merge = rule(
     doc = "Merges RPM packages into an uncompressed tar archive using bsdtar.",
     implementation = _rpm_merge_impl,
     attrs = {
+        "gpg_keys": attr.label_list(
+            allow_files = True,
+            doc = "Optional list of GPG public key files.",
+        ),
+        "gpgcheck": attr.bool(
+            default = False,
+            doc = "Enable GPG signature validation of RPMs.",
+        ),
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
+        "rpmdb": attr.label(
+            allow_single_file = True,
+            doc = "Optional rpmdb SQLite file containing GPG keys.",
+        ),
         "rpms": attr.label_list(
             allow_files = [".rpm"],
             mandatory = True,
             doc = "RPM package files to extract and merge.",
         ),
+        "_keystore_tool": attr.label(
+            default = Label("//dnf5-prebuilt/private:rpm_gpg_keystore"),
+            executable = True,
+            cfg = "exec",
+        ),
+        "_verify_tool": attr.label(
+            default = Label("//dnf5-prebuilt/private:rpm_gpg_verify"),
+            executable = True,
+            cfg = "exec",
+        ),
     },
-    toolchains = [TAR_TOOLCHAIN_TYPE],
+    toolchains = [TAR_TOOLCHAIN_TYPE, DNF5_TOOLCHAIN],
 )
 
 def _tar_dedup_impl(ctx):
@@ -163,14 +231,24 @@ tar_compress = rule(
     toolchains = [TAR_TOOLCHAIN_TYPE],
 )
 
-def rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, **kwargs):
+def rpm_layer(
+        name,
+        rpms,
+        rpmdb = None,
+        compress = None,
+        out = None,
+        gpgcheck = False,
+        gpg_check = None,
+        gpg_keys = [],
+        **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
 
     Implements a multi-pass approach:
-    1. Merge all RPMs with bsdtar into an uncompressed archive.
-    2. Iterate over the entries and deduplicate directory and file paths with Python.
-    3. Inject rpmdb into the archive (if rpmdb is specified).
-    4. Compress the layer (if compress='gzip' or 'zstd' is specified).
+    1. If gpgcheck is enabled, creates a GPG keystore and verifies each RPM's signature against it.
+    2. Merge all RPMs with bsdtar into an uncompressed archive (depends on verification).
+    3. Iterate over the entries and deduplicate directory and file paths with Python.
+    4. Inject rpmdb into the archive (if rpmdb is specified).
+    5. Compress the layer (if compress='gzip' or 'zstd' is specified).
 
     Args:
       name: Target name.
@@ -178,8 +256,12 @@ def rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, **kwargs):
       rpmdb: Optional updated rpmdb SQLite file.
       compress: Optional compression algorithm ('gzip' or 'zstd').
       out: Optional explicit output file name.
+      gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
+      gpg_check: Optional alias for gpgcheck.
+      gpg_keys: Optional list of GPG public key files.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
+    check = gpg_check if gpg_check != None else gpgcheck
     common_kwargs = propagate_common_rule_attributes(kwargs)
     intermediate_kwargs = dict(common_kwargs)
     intermediate_kwargs["visibility"] = ["//visibility:private"]
@@ -188,6 +270,9 @@ def rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, **kwargs):
     rpm_merge(
         name = raw_target,
         rpms = rpms,
+        rpmdb = rpmdb,
+        gpgcheck = check,
+        gpg_keys = gpg_keys,
         out = name + "_raw.tar",
         **intermediate_kwargs
     )

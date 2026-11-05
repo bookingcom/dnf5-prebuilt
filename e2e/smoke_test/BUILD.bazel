@@ -69,6 +69,7 @@ rpm_mark(
 # Package RPM binaries and the updated rpmdb into an OCI layer tarball using public rpm_layer rule.
 rpm_layer(
     name = "ol9_curl_layer_tar",
+    gpgcheck = True,
     rpmdb = ":ol9_curl_rpmdb",
     rpms = [
         "@ol9_libcurl_rpm//file",

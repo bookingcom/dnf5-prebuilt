@@ -22,6 +22,16 @@ py_binary(
 )
 
 py_binary(
+    name = "rpm_gpg_keystore",
+    srcs = ["rpm_gpg_keystore.py"],
+)
+
+py_binary(
+    name = "rpm_gpg_verify",
+    srcs = ["rpm_gpg_verify.py"],
+)
+
+py_binary(
     name = "rpm_mark",
     srcs = ["rpm_mark.py"],
 )
