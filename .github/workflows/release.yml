@@ -29,11 +29,11 @@ jobs:
     env:
       TAG: ${{ inputs.tag_name || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.TAG }}
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dnf5
           path: dist
@@ -41,7 +41,7 @@ jobs:
         run: .github/workflows/release_prep.sh "$TAG" dist >release_notes.md
       - name: Attest build provenance
         id: attest
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/*.tar.gz
@@ -52,7 +52,7 @@ jobs:
           for f in dist/*.tar.gz; do
             cat "${{ steps.attest.outputs.bundle-path }}" | jq --compact-output > "${f}.intoto.jsonl"
           done
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
           body_path: release_notes.md

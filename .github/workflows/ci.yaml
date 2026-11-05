@@ -33,14 +33,14 @@ jobs:
           - os: macos-15
             platform: darwin-arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dnf5
           path: dist
-      - uses: bazel-contrib/setup-bazel@0.15.0
+      - uses: bazel-contrib/setup-bazel@0.19.1
         with:
           bazelisk-cache: true
           repository-cache: true
@@ -69,7 +69,7 @@ jobs:
           ls -la artifacts/
       - name: Upload e2e artifacts
         if: runner.os == 'Linux' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-artifacts
           path: artifacts/
@@ -84,7 +84,7 @@ jobs:
     # only reports there; the tests that run dnf5 themselves halt on it.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bazel
         with:
           buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
@@ -108,7 +108,7 @@ jobs:
   buildifier:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: true
       - name: Check Starlark formatting

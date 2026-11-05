@@ -20,7 +20,7 @@ on:
 
 jobs:
   publish:
-    uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v0.2.2
+    uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v1.5.1
     with:
       tag_name: ${{ inputs.tag_name }}
       # Fork of bazelbuild/bazel-central-registry the pull request is opened from.
