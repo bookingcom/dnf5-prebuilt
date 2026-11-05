@@ -238,7 +238,6 @@ def rpm_layer(
         compress = None,
         out = None,
         gpgcheck = False,
-        gpg_check = None,
         gpg_keys = [],
         **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
