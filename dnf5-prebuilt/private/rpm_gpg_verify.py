@@ -24,6 +24,7 @@ def main():
         "--dbpath", keystore_dir,
         "--install", "--test",
         "--nodeps", "--noscripts",
+        "--ignorearch", "--ignoreos",
         "--replacefiles", "--replacepkgs",
     ]
 
