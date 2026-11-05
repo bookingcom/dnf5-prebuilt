@@ -1,0 +1,33 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//dnf5-prebuilt:defs.bzl", "rpm_merge")
+load(":layer_test.bzl", "distinct_gpg_markers_test")
+
+# Two inputs with the same basename, as when one layer combines two lockfiles
+# that both resolve the same NEVRA. Only analysed, never built.
+write_file(
+    name = "a_rpm",
+    out = "a/foo-1.0-1.noarch.rpm",
+    content = [""],
+)
+
+write_file(
+    name = "b_rpm",
+    out = "b/foo-1.0-1.noarch.rpm",
+    content = [""],
+)
+
+rpm_merge(
+    name = "same_basename",
+    gpgcheck = True,
+    rpms = [
+        ":a_rpm",
+        ":b_rpm",
+    ],
+    tags = ["manual"],
+)
+
+distinct_gpg_markers_test(
+    name = "rpm_merge_same_basename_test",
+    size = "small",
+    target_under_test = ":same_basename",
+)
