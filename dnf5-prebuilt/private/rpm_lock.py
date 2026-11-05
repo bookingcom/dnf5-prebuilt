@@ -354,7 +354,7 @@ def main():
                     if f.endswith(".rpm"):
                         fpath = os.path.join(dl_dir, f)
                         for name, pkg in resolved_pkgs.items():
-                            if f == os.path.basename(pkg["location"]) or f.startswith(name + "-"):
+                            if f == os.path.basename(pkg["location"]):
                                 available_rpms[name] = fpath
             except Exception as e:
                 sys.stderr.write(f"Notice: downloading packages to inspect scriptlets failed: {e}\n")
