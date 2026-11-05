@@ -303,19 +303,85 @@ def main():
                         direct_deps.add(other_name)
             dep_graph[name] = sorted(direct_deps)
 
-        # Transitive dependencies for topological sorting
-        trans_graph = {}
-        for name in resolved_pkgs:
-            trans = set()
-            stack = list(dep_graph.get(name, []))
-            while stack:
-                n = stack.pop()
-                if n not in trans:
-                    trans.add(n)
-                    stack.extend(dep_graph.get(n, []))
-            trans_graph[name] = sorted(trans)
+        # Transitive dependencies and topological sorting for install order
+        remaining_deps = {name: set(dep_graph.get(name, [])) & set(resolved_pkgs.keys()) for name in resolved_pkgs}
+        install_order = []
+        ready = sorted([name for name, deps in remaining_deps.items() if not deps])
+        while ready:
+            curr = ready.pop(0)
+            install_order.append(curr)
+            for name, deps in remaining_deps.items():
+                if curr in deps:
+                    deps.remove(curr)
+                    if not deps and name not in install_order and name not in ready:
+                        ready.append(name)
+                        ready.sort()
 
-        sorted_names = sorted(resolved_pkgs.keys(), key=lambda n: (len(trans_graph[n]), n))
+        # Handle any dependency cycles deterministically
+        while len(install_order) < len(resolved_pkgs):
+            remaining = [name for name in resolved_pkgs if name not in install_order]
+            remaining.sort(key=lambda n: (len(remaining_deps[n]), n))
+            curr = remaining[0]
+            install_order.append(curr)
+            for name, deps in remaining_deps.items():
+                if curr in deps:
+                    deps.remove(curr)
+
+        sorted_names = install_order
+
+        # Check for pre/post install scripts using rpm
+        rpm_scripts_info = {}
+        available_rpms = {}
+        if repo_dir_abs and os.path.isdir(repo_dir_abs):
+            for name, pkg in resolved_pkgs.items():
+                local_path = os.path.join(repo_dir_abs, pkg["location"])
+                if os.path.isfile(local_path):
+                    available_rpms[name] = local_path
+
+        missing_names = [n for n in resolved_pkgs if n not in available_rpms]
+        if missing_names:
+            dl_dir = os.path.join(tmp_dir, "pkgs")
+            os.makedirs(dl_dir, exist_ok=True)
+            dl_cmd = list(dnf5_base) + ["download", "--destdir=" + dl_dir]
+            for a in args.arch.split(","):
+                a = a.strip()
+                if a:
+                    dl_cmd.append(f"--arch={a}")
+            dl_cmd.extend(missing_names)
+            try:
+                subprocess.run(dl_cmd, capture_output=True, text=True, timeout=120)
+                for f in os.listdir(dl_dir):
+                    if f.endswith(".rpm"):
+                        fpath = os.path.join(dl_dir, f)
+                        for name, pkg in resolved_pkgs.items():
+                            if f == os.path.basename(pkg["location"]) or f.startswith(name + "-"):
+                                available_rpms[name] = fpath
+            except Exception as e:
+                sys.stderr.write(f"Notice: downloading packages to inspect scriptlets failed: {e}\n")
+
+        dummy_db = os.path.join(tmp_dir, "dummy_db")
+        os.makedirs(dummy_db, exist_ok=True)
+        for name, rpath in available_rpms.items():
+            try:
+                q_res = subprocess.run(
+                    [
+                        os.path.abspath(args.rpm),
+                        "--dbpath",
+                        dummy_db,
+                        "-qp",
+                        "--queryformat=%{PREIN}---SEP---%{POSTIN}",
+                        rpath,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if q_res.returncode == 0 and "---SEP---" in q_res.stdout:
+                    pre, post = q_res.stdout.split("---SEP---", 1)
+                    has_pre = bool(pre.strip()) and pre.strip() != "(none)"
+                    has_post = bool(post.strip()) and post.strip() != "(none)"
+                    rpm_scripts_info[name] = (has_pre, has_post)
+            except Exception:
+                pass
 
         output_packages = []
         for name in sorted_names:
@@ -339,6 +405,15 @@ def main():
                 "checksum": chk,
                 "dependencies": dep_graph.get(name, []),
             }
+            if name in rpm_scripts_info:
+                has_pre, has_post = rpm_scripts_info[name]
+                if has_pre:
+                    pkg_obj["has_preinstall_script"] = True
+                if has_post:
+                    pkg_obj["has_postinstall_script"] = True
+            elif pkg.get("requires_pre"):
+                pkg_obj["has_preinstall_script"] = True
+
             if pkg["recommends"]:
                 pkg_obj["recommends"] = sorted(pkg["recommends"])
             output_packages.append(pkg_obj)
@@ -347,6 +422,8 @@ def main():
             "version": 1,
             "arch": args.arch,
             "requested": sorted(args.packages),
+            "install_order": sorted_names,
+            "order": sorted_names,
             "packages": output_packages,
         }
 

@@ -18,6 +18,11 @@ def validate_lock_file(path: str) -> None:
     if not isinstance(packages, list) or len(packages) == 0:
         raise ValueError(f"{path}: expected non-empty 'packages' list")
 
+    install_order = data.get("install_order") or data.get("order")
+    if not isinstance(install_order, list) or len(install_order) != len(packages):
+        raise ValueError(f"{path}: expected valid 'install_order' array matching package count: {install_order}")
+
+    pkg_names = set()
     for pkg in packages:
         name = pkg.get("name")
         version = pkg.get("version")
@@ -28,6 +33,7 @@ def validate_lock_file(path: str) -> None:
 
         if not name or not isinstance(name, str):
             raise ValueError(f"{path}: invalid or missing 'name': {pkg}")
+        pkg_names.add(name)
         if not version or not isinstance(version, str):
             raise ValueError(f"{path}: invalid or missing 'version': {pkg}")
         if not arch or not isinstance(arch, str):
@@ -41,7 +47,17 @@ def validate_lock_file(path: str) -> None:
         if not checksum or not isinstance(checksum, str) or len(checksum) != 64:
             raise ValueError(f"{path}: invalid or missing 64-char sha256 checksum: {pkg}")
 
+        if "has_preinstall_script" in pkg and not isinstance(pkg["has_preinstall_script"], bool):
+            raise ValueError(f"{path}: 'has_preinstall_script' must be a boolean: {pkg}")
+        if "has_postinstall_script" in pkg and not isinstance(pkg["has_postinstall_script"], bool):
+            raise ValueError(f"{path}: 'has_postinstall_script' must be a boolean: {pkg}")
+
         print(f"  OK: {name}-{version}.{arch} -> {url} (integrity: {integrity}, sha256: {checksum[:8]}...)")
+
+    for order_name in install_order:
+        if order_name not in pkg_names:
+            raise ValueError(f"{path}: install_order package {order_name} not found in packages list")
+    print(f"  Install order: {' -> '.join(install_order)}")
 
     print(f"Successfully validated {len(packages)} packages in {path}.\n")
 
