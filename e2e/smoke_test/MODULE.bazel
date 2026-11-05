@@ -81,3 +81,18 @@ http_file(
     sha256 = "a522b6ab35fe1118a580537a375ab4f9d41f94b00411497f1d6cdb5e35353dfd",
     urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/libcurl-7.76.1-40.el9_8.9.x86_64.rpm"],
 )
+
+# aarch64 builds of the same packages: their layer is assembled (with gpgcheck) on x86_64 and macOS hosts too.
+http_file(
+    name = "ol9_curl_aarch64_rpm",
+    downloaded_file_path = "curl-7.76.1-40.el9_8.9.aarch64.rpm",
+    sha256 = "e235af3065f386118a2e5e39d93557f0e12d6dba2514dbad1c4850885716e408",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/aarch64/getPackage/curl-7.76.1-40.el9_8.9.aarch64.rpm"],
+)
+
+http_file(
+    name = "ol9_libcurl_aarch64_rpm",
+    downloaded_file_path = "libcurl-7.76.1-40.el9_8.9.aarch64.rpm",
+    sha256 = "1db75284cf1d5f0173af037ebbd4689c3c9cd1a74a25b72901e8d3a3bafeb14c",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/aarch64/getPackage/libcurl-7.76.1-40.el9_8.9.aarch64.rpm"],
+)

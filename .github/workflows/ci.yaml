@@ -21,6 +21,10 @@ jobs:
   e2e:
     # Runs e2e/smoke_test, which consumes the public API (dnf5-prebuilt/) like
     # a user would, against the archives built above on Linux and macOS.
+    # Both Linux runners build the x86_64 and the aarch64 layers, so each one
+    # verifies and merges RPMs of the other architecture. On macOS the
+    # image-based targets are incompatible with the host and skipped; only the
+    # negative GPG check below exercises rpm_layer there.
     name: e2e (${{ matrix.platform }})
     needs: build
     runs-on: ${{ matrix.os }}
@@ -30,6 +34,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
           - os: macos-15
             platform: darwin-arm64
     steps:
@@ -49,18 +55,33 @@ jobs:
         run: >
           bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: GPG verification rejects RPMs without a trusted key
+        working-directory: e2e/smoke_test
+        run: |
+          if bazel --bazelrc=../../.github/workflows/ci.bazelrc build //:ol9_curl_nokey_layer_tar \
+              --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist >nokey.log 2>&1; then
+            cat nokey.log
+            echo "::error::rpm_layer(gpgcheck = True) accepted RPMs signed with an unknown key"
+            exit 1
+          fi
+          if ! grep -q "NOKEY" nokey.log; then
+            cat nokey.log
+            echo "::error::the build failed, but not on the missing signing key"
+            exit 1
+          fi
       - name: Load container image into Docker
-        if: runner.os == 'Linux'
+        # The base image is pulled for linux/amd64 only.
+        if: matrix.platform == 'linux-amd64'
         working-directory: e2e/smoke_test
         run: >
           bazel --bazelrc=../../.github/workflows/ci.bazelrc run //:load_ol9_curl_image
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
       - name: Validate container execution offline
-        if: runner.os == 'Linux'
+        if: matrix.platform == 'linux-amd64'
         working-directory: e2e/smoke_test
         run: ./validate_image.sh localhost/e2e-curl-test:latest
       - name: Collect artifacts
-        if: runner.os == 'Linux' && always()
+        if: matrix.platform == 'linux-amd64' && always()
         run: |
           mkdir -p artifacts
           cp -f e2e/smoke_test/bazel-bin/*.lock.json artifacts/ || true
@@ -68,7 +89,7 @@ jobs:
           docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
           ls -la artifacts/
       - name: Upload e2e artifacts
-        if: runner.os == 'Linux' && always()
+        if: matrix.platform == 'linux-amd64' && always()
         uses: actions/upload-artifact@v7
         with:
           name: e2e-artifacts
