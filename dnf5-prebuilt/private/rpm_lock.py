@@ -423,7 +423,6 @@ def main():
             "arch": args.arch,
             "requested": sorted(args.packages),
             "install_order": sorted_names,
-            "order": sorted_names,
             "packages": output_packages,
         }
 
