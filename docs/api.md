@@ -49,7 +49,7 @@ load(
 ### `rpm_layer`
 
 ```starlark
-rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpg_check = None, gpg_keys = [], **kwargs)
+rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpg_keys = [], **kwargs)
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
@@ -69,7 +69,6 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 | `compress` | `string` | `None` | Optional compression format: `"gzip"` (`.tar.gz`) or `"zstd"` (`.tar.zst`). Uncompressed tar when omitted. |
 | `out` | `string` | `None` | Optional explicit output filename. Defaults to `<name>.tar` or `<name>.tar.{gz,zst}`. |
 | `gpgcheck` | `bool` | `False` | When `True`, enables hermetic GPG signature validation for all RPM packages prior to archive creation. |
-| `gpg_check` | `bool` | `None` | Alias for `gpgcheck`. |
 | `gpg_keys` | `list of labels` | `[]` | Optional list of GPG public key files (`.key`, `.asc`, `RPM-GPG-KEY-*`) imported into the keystore. |
 | `**kwargs` | `dict` | | Common rule attributes (e.g. `visibility`, `tags`). |
 

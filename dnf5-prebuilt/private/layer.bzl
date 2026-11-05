@@ -36,8 +36,9 @@ def _rpm_merge_impl(ctx):
             use_default_shell_env = True,
         )
 
-        for rpm in ctx.files.rpms:
-            verified_marker = ctx.actions.declare_file(ctx.label.name + "_" + rpm.basename + ".gpg_verified")
+        # Indexed by position: two inputs may share a basename (the same NEVRA from two repositories).
+        for i, rpm in enumerate(ctx.files.rpms):
+            verified_marker = ctx.actions.declare_file("%s_gpg/%d_%s.verified" % (ctx.label.name, i, rpm.basename))
             v_args = ctx.actions.args()
             v_args.add("--rpm-bin", dnf5.rpm.path)
             v_args.add("--keystore", keystore_dir.path)
@@ -256,11 +257,9 @@ def rpm_layer(
       compress: Optional compression algorithm ('gzip' or 'zstd').
       out: Optional explicit output file name.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
-      gpg_check: Optional alias for gpgcheck.
       gpg_keys: Optional list of GPG public key files.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
-    check = gpg_check if gpg_check != None else gpgcheck
     common_kwargs = propagate_common_rule_attributes(kwargs)
     intermediate_kwargs = dict(common_kwargs)
     intermediate_kwargs["visibility"] = ["//visibility:private"]
@@ -270,7 +269,7 @@ def rpm_layer(
         name = raw_target,
         rpms = rpms,
         rpmdb = rpmdb,
-        gpgcheck = check,
+        gpgcheck = gpgcheck,
         gpg_keys = gpg_keys,
         out = name + "_raw.tar",
         **intermediate_kwargs

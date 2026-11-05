@@ -19,7 +19,8 @@ def main():
     rpm_file = os.path.abspath(args.rpm)
     rpm_bin = os.path.abspath(args.rpm_bin)
 
-    cmd = [
+    # --ignorearch/--ignoreos: only the signature matters, not whether the exec host could install the package.
+    base_cmd = [
         rpm_bin,
         "--dbpath", keystore_dir,
         "--install", "--test",
@@ -28,32 +29,24 @@ def main():
         "--replacefiles", "--replacepkgs",
     ]
 
+    def verify(keyring_fs):
+        keyring = ["--define", "_keyring fs"] if keyring_fs else []
+        return subprocess.run(
+            base_cmd + keyring + [rpm_file], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+
     has_rpmdb = os.path.isfile(os.path.join(keystore_dir, "rpmdb.sqlite"))
     has_pubkeys = os.path.isdir(os.path.join(keystore_dir, "pubkeys")) and bool(
         os.listdir(os.path.join(keystore_dir, "pubkeys"))
     )
 
-    if has_pubkeys and not has_rpmdb:
-        cmd.extend(["--define", "_keyring fs"])
-
-    cmd.append(rpm_file)
-
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if res.returncode != 0:
-        # If both rpmdb and pubkeys exist and default failed, try _keyring fs
-        if has_rpmdb and has_pubkeys:
-            cmd_fs = [
-                rpm_bin,
-                "--define", "_keyring fs",
-                "--dbpath", keystore_dir,
-                "--install", "--test",
-                "--nodeps", "--noscripts",
-                "--replacefiles", "--replacepkgs",
-                rpm_file,
-            ]
-            res_fs = subprocess.run(cmd_fs, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            if res_fs.returncode == 0:
-                res = res_fs
+    res = verify(keyring_fs=has_pubkeys and not has_rpmdb)
+    # With both an rpmdb and key files, the keys may be only in the files: retry with the fs keyring,
+    # but report the first failure if that fails too.
+    if res.returncode != 0 and has_rpmdb and has_pubkeys:
+        res_fs = verify(keyring_fs=True)
+        if res_fs.returncode == 0:
+            res = res_fs
 
     if res.returncode != 0:
         sys.stderr.write(f"GPG signature verification failed for {args.rpm}:\n{res.stdout}\n")
