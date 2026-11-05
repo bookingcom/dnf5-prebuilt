@@ -256,11 +256,9 @@ def rpm_layer(
       compress: Optional compression algorithm ('gzip' or 'zstd').
       out: Optional explicit output file name.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
-      gpg_check: Optional alias for gpgcheck.
       gpg_keys: Optional list of GPG public key files.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
-    check = gpg_check if gpg_check != None else gpgcheck
     common_kwargs = propagate_common_rule_attributes(kwargs)
     intermediate_kwargs = dict(common_kwargs)
     intermediate_kwargs["visibility"] = ["//visibility:private"]
@@ -270,7 +268,7 @@ def rpm_layer(
         name = raw_target,
         rpms = rpms,
         rpmdb = rpmdb,
-        gpgcheck = check,
+        gpgcheck = gpgcheck,
         gpg_keys = gpg_keys,
         out = name + "_raw.tar",
         **intermediate_kwargs

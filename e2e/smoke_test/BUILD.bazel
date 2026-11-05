@@ -10,10 +10,31 @@ load(
     "oraclelinux_9_environment",
 )
 
+OL9_CURL_RPMS = [
+    "@ol9_libcurl_rpm//file",
+    "@ol9_curl_rpm//file",
+]
+
+OL10_CURL_AMD64_RPMS = [
+    "@ol10_curl_amd64_rpm//file",
+]
+
+OL10_CURL_ARM64_RPMS = [
+    "@ol10_curl_arm64_rpm//file",
+]
+
 # Extract rpmdb and repository configurations from container images.
 oraclelinux_9_environment(name = "ol9")
 
-oraclelinux_10_environment(name = "ol10")
+oraclelinux_10_environment(
+    name = "ol10_amd64",
+    platform = "linux/amd64",
+)
+
+oraclelinux_10_environment(
+    name = "ol10_arm64",
+    platform = "linux/arm64",
+)
 
 centos_stream_9_environment(name = "centos9")
 
@@ -26,10 +47,30 @@ rpm_lock(
 )
 
 rpm_lock(
-    name = "ol10_lock",
-    base_rpmdb = ":ol10_rpmdb",
-    config = ":ol10_dnf_config",
+    name = "ol10_curl_amd64_lock",
+    arch = [
+        "x86_64",
+        "noarch",
+    ],
+    base_rpmdb = ":ol10_amd64_rpmdb",
+    config = ":ol10_amd64_dnf_config",
     packages = ["curl"],
+)
+
+rpm_lock(
+    name = "ol10_curl_arm64_lock",
+    arch = [
+        "aarch64",
+        "noarch",
+    ],
+    base_rpmdb = ":ol10_arm64_rpmdb",
+    config = ":ol10_arm64_dnf_config",
+    packages = ["curl"],
+)
+
+alias(
+    name = "ol10_lock",
+    actual = ":ol10_curl_amd64_lock",
 )
 
 rpm_lock(
@@ -45,14 +86,31 @@ sh_test(
     srcs = ["run_lock_test.sh"],
     args = [
         "$(rootpath :ol9_curl_lock)",
-        "$(rootpath :ol10_lock)",
+        "$(rootpath :ol10_curl_amd64_lock)",
+        "$(rootpath :ol10_curl_arm64_lock)",
         "$(rootpath :centos9_lock)",
     ],
     data = [
         "test_lock_generated.py",
         ":centos9_lock",
-        ":ol10_lock",
+        ":ol10_curl_amd64_lock",
+        ":ol10_curl_arm64_lock",
         ":ol9_curl_lock",
+    ],
+)
+
+# Dedicated test that validates the Oracle Linux 10 amd64 and arm64 lock files.
+sh_test(
+    name = "test_ol10_generated_locks",
+    srcs = ["run_lock_test.sh"],
+    args = [
+        "$(rootpath :ol10_curl_amd64_lock)",
+        "$(rootpath :ol10_curl_arm64_lock)",
+    ],
+    data = [
+        "test_lock_generated.py",
+        ":ol10_curl_amd64_lock",
+        ":ol10_curl_arm64_lock",
     ],
 )
 
@@ -60,10 +118,7 @@ sh_test(
 rpm_mark(
     name = "ol9_curl_rpmdb",
     base_rpmdb = ":ol9_rpmdb",
-    rpms = [
-        "@ol9_libcurl_rpm//file",
-        "@ol9_curl_rpm//file",
-    ],
+    rpms = OL9_CURL_RPMS,
 )
 
 # Package RPM binaries and the updated rpmdb into an OCI layer tarball using public rpm_layer rule.
@@ -71,10 +126,34 @@ rpm_layer(
     name = "ol9_curl_layer_tar",
     gpgcheck = True,
     rpmdb = ":ol9_curl_rpmdb",
-    rpms = [
-        "@ol9_libcurl_rpm//file",
-        "@ol9_curl_rpm//file",
-    ],
+    rpms = OL9_CURL_RPMS,
+)
+
+# Oracle Linux 10: amd64 and arm64 curl rpmdb and layer targets
+rpm_mark(
+    name = "ol10_curl_amd64_rpmdb",
+    base_rpmdb = ":ol10_amd64_rpmdb",
+    rpms = OL10_CURL_AMD64_RPMS,
+)
+
+rpm_layer(
+    name = "ol10_curl_amd64_layer_tar",
+    gpgcheck = True,
+    rpmdb = ":ol10_curl_amd64_rpmdb",
+    rpms = OL10_CURL_AMD64_RPMS,
+)
+
+rpm_mark(
+    name = "ol10_curl_arm64_rpmdb",
+    base_rpmdb = ":ol10_arm64_rpmdb",
+    rpms = OL10_CURL_ARM64_RPMS,
+)
+
+rpm_layer(
+    name = "ol10_curl_arm64_layer_tar",
+    gpgcheck = True,
+    rpmdb = ":ol10_curl_arm64_rpmdb",
+    rpms = OL10_CURL_ARM64_RPMS,
 )
 
 # Build OCI layer and image manifest with the new layer.
@@ -94,6 +173,49 @@ image_load(
     name = "load_ol9_curl_image",
     image = ":ol9_curl_image",
     tag = "localhost/e2e-curl-test:latest",
+)
+
+# Oracle Linux 10 container images and load targets (amd64 and arm64)
+layer_from_tar(
+    name = "ol10_curl_amd64_layer",
+    src = ":ol10_curl_amd64_layer_tar",
+)
+
+layer_from_tar(
+    name = "ol10_curl_arm64_layer",
+    src = ":ol10_curl_arm64_layer_tar",
+)
+
+image_manifest(
+    name = "ol10_curl_amd64_image",
+    base = "@oraclelinux_10_slim//:image",
+    layers = [":ol10_curl_amd64_layer"],
+    platform = "@rules_img//img/private/platforms:linux_amd64",
+)
+
+image_manifest(
+    name = "ol10_curl_arm64_image",
+    base = "@oraclelinux_10_slim//:image",
+    layers = [":ol10_curl_arm64_layer"],
+    platform = "@rules_img//img/private/platforms:linux_arm64",
+)
+
+image_load(
+    name = "load_ol10_curl_amd64_image",
+    image = ":ol10_curl_amd64_image",
+    tag_list = [
+        "localhost/e2e-ol10-curl-test:latest",
+        "localhost/e2e-ol10-curl-amd64:latest",
+    ],
+)
+
+image_load(
+    name = "load_ol10_curl_arm64_image",
+    image = ":ol10_curl_arm64_image",
+    tag_list = [
+        "localhost/e2e-ol10-curl-test:latest",
+        "localhost/e2e-ol10-curl-arm64:latest",
+    ],
 )
 
 # Test container execution without network access.

@@ -1,0 +1,22 @@
+{
+  "version":1,
+  "arch":"aarch64,noarch",
+  "requested":[
+    "curl"
+  ],
+  "install_order":[
+    "curl"
+  ],
+  "packages":[
+    {
+      "name":"curl",
+      "version":"8.12.1-4.el10_2.7",
+      "arch":"aarch64",
+      "nevra":"curl-8.12.1-4.el10_2.7.aarch64",
+      "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/aarch64\/getPackage\/curl-8.12.1-4.el10_2.7.aarch64.rpm",
+      "integrity":"sha256-fSdJBTuC8NeAIje3eIrvDH8gLxzqk3B7wNDCUhT\/mGU=",
+      "checksum":"7d2749053b82f0d7802237b7788aef0c7f202f1cea93707bc0d0c25214ff9865",
+      "dependencies":[]
+    }
+  ]
+}

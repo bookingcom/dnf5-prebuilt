@@ -3,4 +3,13 @@ common --enable_bzlmod
 common --registry=https://bazel-contrib.github.io/rules_img
 common --registry=https://bcr.bazel.build
 test --test_output=errors
+
+build:rbe --host_platform=@buildbuddy_toolchain//:platform
+build:rbe --extra_execution_platforms=@buildbuddy_toolchain//:platform
+build:rbe --spawn_strategy=remote
+build:rbe --remote_local_fallback=true
+build:rbe --remote_download_outputs=toplevel
+build:rbe --remote_cache_compression
+build:rbe --experimental_remote_cache_chunking
+
 try-import %workspace%/.bazelrc.user
