@@ -22,7 +22,14 @@ jobs:
       - name: Test
         run: >
           bazel --bazelrc=.github/workflows/ci.bazelrc test
-          --config=linux_amd64 -c opt //bazel/tests/... //dnf5-prebuilt/private/...
+          --config=linux_amd64 -c opt -- //bazel/tests/... -//bazel/tests/layer/...
+      - name: Test the rules
+        # For the host platform, not --config=linux_amd64: no execution
+        # platform matches the glibc constraints of //bazel:linux_amd64, so no
+        # test toolchain resolves and its tests cannot run.
+        run: >
+          bazel --bazelrc=.github/workflows/ci.bazelrc test
+          //bazel/tests/layer/... //dnf5-prebuilt/private/...
       - name: Build
         run: |
           mkdir -p dist
