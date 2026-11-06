@@ -31,9 +31,9 @@ register_toolchains("@dnf5_toolchains//:all")
 ```
 
 The toolchain type is `@dnf5-prebuilt//dnf5-prebuilt:toolchain_type` and
-provides `Dnf5Info` (`dnf5`: the launcher, `files`: the whole distribution,
-`version`). `@dnf5-prebuilt//dnf5-prebuilt:current_toolchain` exposes the
-toolchain resolved for the execution platform:
+provides `Dnf5Info` (`dnf5`: the launcher, `rpm`: the rpm launcher, `files`:
+the whole distribution, `version`). `@dnf5-prebuilt//dnf5-prebuilt:current_toolchain`
+exposes the toolchain resolved for the execution platform:
 
 ```starlark
 # In a rule implementation

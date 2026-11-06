@@ -4,17 +4,14 @@ Dnf5Info = provider(
     doc = "A dnf5 distribution.",
     fields = {
         "dnf5": "File: bin/dnf5, the launcher to run in actions.",
-        "rpm": "File: bin/rpm, the rpm launcher to run in actions (optional).",
+        "rpm": "File: bin/rpm, the rpm launcher to run in actions.",
         "files": "depset of File: every file of the distribution (inputs of actions running dnf5 or rpm).",
         "version": "string: dnf5 version.",
     },
 )
 
 def _dnf5_toolchain_impl(ctx):
-    all_files = ctx.files.files + [ctx.file.dnf5]
-    if ctx.file.rpm:
-        all_files.append(ctx.file.rpm)
-    files = depset(all_files)
+    files = depset(ctx.files.files + [ctx.file.dnf5, ctx.file.rpm])
     info = Dnf5Info(
         dnf5 = ctx.file.dnf5,
         rpm = ctx.file.rpm,
@@ -35,13 +32,14 @@ dnf5_toolchain = rule(
             mandatory = True,
             doc = "The bin/dnf5 launcher of the distribution.",
         ),
-        "rpm": attr.label(
-            allow_single_file = True,
-            doc = "The bin/rpm launcher of the distribution.",
-        ),
         "files": attr.label_list(
             allow_files = True,
             doc = "All files of the distribution.",
+        ),
+        "rpm": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+            doc = "The bin/rpm launcher of the distribution.",
         ),
         "version": attr.string(doc = "dnf5 version of the distribution."),
     },
@@ -50,8 +48,6 @@ dnf5_toolchain = rule(
 def _current_dnf5_toolchain_impl(ctx):
     info = ctx.toolchains[Label("//dnf5-prebuilt:toolchain_type")].dnf5_info
     target_file = info.rpm if ctx.attr.binary == "rpm" else info.dnf5
-    if not target_file:
-        fail("Toolchain does not provide binary '%s'" % ctx.attr.binary)
     exe = ctx.actions.declare_file(ctx.label.name)
     ctx.actions.symlink(
         output = exe,

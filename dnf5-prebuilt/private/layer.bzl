@@ -14,8 +14,6 @@ def _rpm_merge_impl(ctx):
     if ctx.attr.gpgcheck:
         keystore_dir = ctx.actions.declare_directory(ctx.label.name + "_gpg_keystore")
         dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
-        if not dnf5.rpm:
-            fail("GPG signature validation requires an rpm binary in the dnf5 toolchain")
 
         ks_args = ctx.actions.args()
         ks_args.add("--output", keystore_dir.path)

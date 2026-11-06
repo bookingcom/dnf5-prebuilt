@@ -332,7 +332,7 @@ Rule that records RPM packages into an SQLite `rpmdb` database without installin
 ### `dnf5_toolchain`
 
 ```starlark
-dnf5_toolchain(name, dnf5, rpm = None, files = [], version = "")
+dnf5_toolchain(name, dnf5, rpm, files = [], version = "")
 ```
 
 Rule defining a dnf5 toolchain resolved for an execution platform.
@@ -343,8 +343,8 @@ Rule defining a dnf5 toolchain resolved for an execution platform.
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Toolchain rule name. |
 | `dnf5` | `label` | *mandatory* | Path to the `bin/dnf5` launcher of the distribution. |
-| `rpm` | `label` | `None` | Optional path to the `bin/rpm` launcher of the distribution. |
 | `files` | `list of labels` | `[]` | Complete distribution files (runtime binaries, shared libraries, plugins). |
+| `rpm` | `label` | *mandatory* | Path to the `bin/rpm` launcher of the distribution. |
 | `version` | `string` | `""` | Toolchain distribution version string. |
 
 ---
@@ -371,7 +371,7 @@ Rule exposing the resolved launcher (`dnf5` or `rpm`) for the execution platform
 Provider returned by `dnf5_toolchain` and `current_dnf5_toolchain`:
 
 - `dnf5`: `File` pointing to `bin/dnf5`.
-- `rpm`: `File` pointing to `bin/rpm` (optional).
+- `rpm`: `File` pointing to `bin/rpm`.
 - `files`: `depset of File` with the entire distribution.
 - `version`: Distribution version string.
 
