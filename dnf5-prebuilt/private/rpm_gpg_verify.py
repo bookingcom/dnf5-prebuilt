@@ -5,6 +5,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 
 
 def main():
@@ -20,9 +21,11 @@ def main():
     rpm_file = os.path.abspath(args.rpm)
     rpm_bin = os.path.abspath(args.rpm_bin)
 
+    lock_file = os.path.join(tempfile.gettempdir(), f".rpm_keyring_{os.getpid()}.lock")
     cmd = [
         rpm_bin,
         "--define", f"_keyring {args.keyring}",
+        "--define", f"_keyring_lockpath {lock_file}",
         "--dbpath", rpmdb_dir,
         "--install", "--test",
         "--nodeps", "--noscripts",
@@ -32,7 +35,15 @@ def main():
         rpm_file,
     ]
 
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    finally:
+        if os.path.exists(lock_file):
+            try:
+                os.remove(lock_file)
+            except OSError:
+                pass
+
     if res.returncode != 0:
         sys.stderr.write(f"GPG signature verification failed for {args.rpm}:\n{res.stdout}\n")
         sys.exit(res.returncode)
