@@ -1,0 +1,11 @@
+startup --experimental_remote_repo_contents_cache
+
+common --enable_bzlmod
+common --lockfile_mode=update
+common --registry=https://bazel-contrib.github.io/rules_img
+common --registry=https://bcr.bazel.build
+
+test --test_output=errors
+
+# Import local user configurations if present (e.g. BuildBuddy credentials)
+try-import %workspace%/.bazelrc.user
