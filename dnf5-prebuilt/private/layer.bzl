@@ -23,8 +23,8 @@ def _rpm_merge_impl(ctx):
         if ctx.file.rpmdb:
             ks_args.add("--rpmdb", ctx.file.rpmdb.path)
             ks_inputs.append(ctx.file.rpmdb)
-        if ctx.files.gpg_keys:
-            for k in ctx.files.gpg_keys:
+        if ctx.files.gpgkeys:
+            for k in ctx.files.gpgkeys:
                 ks_args.add("--key", k.path)
                 ks_inputs.append(k)
 
@@ -38,11 +38,13 @@ def _rpm_merge_impl(ctx):
             use_default_shell_env = True,
         )
 
+        keyring_type = "fs" if ctx.files.gpgkeys else "rpmdb"
         for rpm in ctx.files.rpms:
             verified_marker = ctx.actions.declare_file(ctx.label.name + "_" + rpm.basename + ".gpg_verified")
             v_args = ctx.actions.args()
             v_args.add("--rpm-bin", dnf5.rpm.path)
-            v_args.add("--keystore", keystore_dir.path)
+            v_args.add("--rpmdb", keystore_dir.path)
+            v_args.add("--keyring", keyring_type)
             v_args.add("--rpm", rpm.path)
             v_args.add("--output", verified_marker.path)
 
@@ -81,13 +83,13 @@ rpm_merge = rule(
     doc = "Merges RPM packages into an uncompressed tar archive using bsdtar.",
     implementation = _rpm_merge_impl,
     attrs = {
-        "gpg_keys": attr.label_list(
-            allow_files = True,
-            doc = "Optional list of GPG public key files.",
-        ),
         "gpgcheck": attr.bool(
             default = False,
             doc = "Enable GPG signature validation of RPMs.",
+        ),
+        "gpgkeys": attr.label_list(
+            allow_files = True,
+            doc = "Optional list of GPG public key files.",
         ),
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
         "rpmdb": attr.label(
@@ -240,7 +242,7 @@ def rpm_layer(
         compress = None,
         out = None,
         gpgcheck = False,
-        gpg_keys = [],
+        gpgkeys = [],
         **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
 
@@ -257,7 +259,7 @@ def rpm_layer(
       compress: Optional compression algorithm ('gzip' or 'zstd').
       out: Optional explicit output file name.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
-      gpg_keys: Optional list of GPG public key files.
+      gpgkeys: Optional list of GPG public key files.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
     common_kwargs = propagate_common_rule_attributes(kwargs)
@@ -270,7 +272,7 @@ def rpm_layer(
         rpms = rpms,
         rpmdb = rpmdb,
         gpgcheck = gpgcheck,
-        gpg_keys = gpg_keys,
+        gpgkeys = gpgkeys,
         out = name + "_raw.tar",
         **intermediate_kwargs
     )

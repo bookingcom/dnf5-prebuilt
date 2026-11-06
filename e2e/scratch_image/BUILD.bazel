@@ -145,8 +145,8 @@ rpm_mark(
 
 rpm_layer(
     name = "ol10_scratch_curl_amd64_layer_tar",
-    gpg_keys = ["@ol10_gpg_key//file"],
     gpgcheck = True,
+    gpgkeys = ["@ol10_gpg_key//file"],
     rpmdb = ":ol10_scratch_curl_amd64_rpmdb",
     rpms = OL10_AMD64_CURL_RPMS,
 )
@@ -158,8 +158,8 @@ rpm_mark(
 
 rpm_layer(
     name = "ol10_scratch_curl_arm64_layer_tar",
-    gpg_keys = ["@ol10_gpg_key//file"],
     gpgcheck = True,
+    gpgkeys = ["@ol10_gpg_key//file"],
     rpmdb = ":ol10_scratch_curl_arm64_rpmdb",
     rpms = OL10_ARM64_CURL_RPMS,
 )
