@@ -3,5 +3,21 @@
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    ".worktrees/**",
+    "bazel/3rdparty/**"
+  ],
+  "bazel-module": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["bazel-module"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "bazel dependencies (non-major)"
+    }
   ]
 }
