@@ -14,7 +14,7 @@ jobs:
     # so the platforms share the Bazel server, exec tools and caches.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-bazel
         with:
           buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
@@ -29,7 +29,7 @@ jobs:
           bazel --bazelrc=.github/workflows/ci.bazelrc build -c opt //bazel/release:dist
           cp -L bazel-bin/bazel/release/dnf5-*.tar.gz dist/
           ls -l dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dnf5
           path: dist/*.tar.gz
