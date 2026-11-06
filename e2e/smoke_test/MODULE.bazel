@@ -49,7 +49,10 @@ pull(
 pull(
     name = "oraclelinux_10_slim",
     layer_handling = "eager",
-    platforms = ["linux/amd64"],
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
     registry = "index.docker.io",
     repository = "library/oraclelinux",
     tag = "10-slim",
@@ -80,4 +83,18 @@ http_file(
     downloaded_file_path = "libcurl-7.76.1-40.el9_8.9.x86_64.rpm",
     sha256 = "a522b6ab35fe1118a580537a375ab4f9d41f94b00411497f1d6cdb5e35353dfd",
     urls = ["https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/libcurl-7.76.1-40.el9_8.9.x86_64.rpm"],
+)
+
+http_file(
+    name = "ol10_curl_amd64_rpm",
+    downloaded_file_path = "curl-8.12.1-4.el10_2.7.x86_64.rpm",
+    sha256 = "bb5750c88205fd6ef6d9775e6c3b347d5c8f644aca27cfa468dfd9130168c79f",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL10/baseos/latest/x86_64/getPackage/curl-8.12.1-4.el10_2.7.x86_64.rpm"],
+)
+
+http_file(
+    name = "ol10_curl_arm64_rpm",
+    downloaded_file_path = "curl-8.12.1-4.el10_2.7.aarch64.rpm",
+    sha256 = "7d2749053b82f0d7802237b7788aef0c7f202f1cea93707bc0d0c25214ff9865",
+    urls = ["https://yum.oracle.com/repo/OracleLinux/OL10/baseos/latest/aarch64/getPackage/curl-8.12.1-4.el10_2.7.aarch64.rpm"],
 )
