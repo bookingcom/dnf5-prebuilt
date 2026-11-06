@@ -449,3 +449,10 @@ http_file(
     sha256 = "d9dc3a464f9e13ae6540fb32afd2eadc25738f856add4376f549ffd2bcdf9dee",
     urls = ["https://yum.oracle.com/repo/OracleLinux/OL10/baseos/latest/aarch64/getPackage/curl-8.9.1-5.el10.aarch64.rpm"],
 )
+
+http_file(
+    name = "ol10_gpg_key",
+    downloaded_file_path = "RPM-GPG-KEY-oracle-ol10.key",
+    sha256 = "9badfdf6c90098658e3154fed1b8d4d0eefd19c193982b27c68f6a73a1b21695",
+    urls = ["https://yum.oracle.com/RPM-GPG-KEY-oracle-ol10"],
+)
