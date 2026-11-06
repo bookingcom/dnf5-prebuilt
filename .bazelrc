@@ -72,8 +72,8 @@ build:osx_amd64 --platforms=//bazel:osx_amd64
 build:osx_arm64 --platforms=//bazel:osx_arm64
 
 # ASan + LSan + UBSan (`--config=asan`): dnf5 and every C/C++ dependency built
-# with the hermetic LLVM toolchain's sanitizers. Run the e2e tests against the
-# resulting archive with the options of the sanitizers job in .github/workflows/ci.yaml.
+# with the hermetic LLVM toolchain's sanitizers.
+build:asan -c opt
 build:asan --@llvm//config:asan=true
 build:asan --@llvm//config:ubsan=true
 # GLib/GObject cast every class_init/base_init callback to GBaseInitFunc & co;
@@ -82,6 +82,9 @@ build:asan --copt=-fno-sanitize=function
 build:asan --copt=-fno-omit-frame-pointer
 build:asan --copt=-g1
 build:asan --strip=never
+test:asan --test_env=ASAN_OPTIONS=detect_leaks=1:detect_stack_use_after_return=1:print_summary=1
+test:asan --test_env=LSAN_OPTIONS=suppressions=%workspace%/sanitizers/lsan.supp:print_suppressions=0
+test:asan --test_env=UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=%workspace%/sanitizers/ubsan.supp
 
 # Test output settings
 test --test_summary=terse
