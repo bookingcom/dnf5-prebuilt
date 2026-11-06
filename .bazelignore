@@ -1,3 +1,4 @@
 .worktrees
 bazel/3rdparty
 e2e/smoke_test
+e2e/scratch_image

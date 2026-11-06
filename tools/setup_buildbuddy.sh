@@ -39,6 +39,8 @@ EOF
 
 write_buildbuddy_rc ".bazelrc.user" "${config_profile}"
 
-if [ -d e2e/smoke_test ]; then
-  write_buildbuddy_rc "e2e/smoke_test/.bazelrc.user" "buildbuddy"
-fi
+for suite in e2e/*; do
+  if [ -d "${suite}" ]; then
+    write_buildbuddy_rc "${suite}/.bazelrc.user" "buildbuddy"
+  fi
+done

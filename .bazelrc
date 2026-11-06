@@ -2,7 +2,7 @@
 startup --experimental_remote_repo_contents_cache
 
 # Common settings
-common --deleted_packages=e2e/smoke_test
+common --deleted_packages=e2e/smoke_test,e2e/scratch_image
 
 # Bazel Registry configuration: Local bazel/3rdparty registry first, fallback to BCR
 common --registry=file://%workspace%/bazel/3rdparty

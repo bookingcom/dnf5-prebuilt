@@ -1,0 +1,13 @@
+[ol10_baseos_latest]
+name=Oracle Linux 10 BaseOS Latest ($basearch)
+baseurl=https://yum$ociregion.$ocidomain/repo/OracleLinux/OL10/baseos/latest/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+gpgcheck=1
+enabled=1
+
+[ol10_appstream]
+name=Oracle Linux 10 Application Stream Packages ($basearch)
+baseurl=https://yum$ociregion.$ocidomain/repo/OracleLinux/OL10/appstream/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+gpgcheck=1
+enabled=1

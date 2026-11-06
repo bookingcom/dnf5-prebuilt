@@ -32,10 +32,14 @@ jobs:
             platform: linux-amd64
             ol10_image: ol10_curl_amd64_image
             ol10_load_target: load_ol10_curl_amd64_image
+            scratch_image: ol10_scratch_curl_amd64_image
+            scratch_load_target: load_ol10_scratch_curl_amd64_image
           - os: ubuntu-24.04-arm
             platform: linux-arm64
             ol10_image: ol10_curl_arm64_image
             ol10_load_target: load_ol10_curl_arm64_image
+            scratch_image: ol10_scratch_curl_arm64_image
+            scratch_load_target: load_ol10_scratch_curl_arm64_image
           - os: macos-15
             platform: darwin-arm64
     steps:
@@ -70,6 +74,26 @@ jobs:
       - name: Run curl --version in Oracle Linux 10 container
         if: runner.os == 'Linux'
         run: docker run --network none --rm localhost/e2e-ol10-curl-test:latest curl --version
+      - name: Scratch image e2e test
+        working-directory: e2e/scratch_image
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Build Oracle Linux 10 scratch container image
+        if: runner.os == 'Linux'
+        working-directory: e2e/scratch_image
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc build //:${{ matrix.scratch_image }}
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Load Oracle Linux 10 scratch container image into Docker
+        if: runner.os == 'Linux'
+        working-directory: e2e/scratch_image
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc run //:${{ matrix.scratch_load_target }}
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Run curl --version in Oracle Linux 10 scratch container
+        if: runner.os == 'Linux'
+        run: docker run --network none --rm localhost/e2e-ol10-scratch-curl:latest curl --version
       - name: Load OL9 container image into Docker
         if: matrix.platform == 'linux-amd64'
         working-directory: e2e/smoke_test
@@ -86,7 +110,10 @@ jobs:
           mkdir -p artifacts
           cp -f e2e/smoke_test/bazel-bin/*.lock.json artifacts/ || true
           cp -f e2e/smoke_test/bazel-bin/*rpmdb*.sqlite artifacts/ || true
+          cp -f e2e/scratch_image/bazel-bin/*.lock.json artifacts/ || true
+          cp -f e2e/scratch_image/bazel-bin/*rpmdb*.sqlite artifacts/ || true
           docker save -o artifacts/ol10_curl_image.tar localhost/e2e-ol10-curl-test:latest || true
+          docker save -o artifacts/ol10_scratch_curl_image.tar localhost/e2e-ol10-scratch-curl:latest || true
           if [ "${{ matrix.platform }}" = "linux-amd64" ]; then
             docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
           fi
