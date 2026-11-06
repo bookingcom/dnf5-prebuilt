@@ -11,12 +11,16 @@ def _rpm_mark_impl(ctx):
     args.add("--output=" + out.path)
     if ctx.file.base_rpmdb:
         args.add("--base-rpmdb=" + ctx.file.base_rpmdb.path)
+    if ctx.file.lockfile:
+        args.add("--lockfile=" + ctx.file.lockfile.path)
     args.add("--rpm=" + dnf5.rpm.path)
     args.add_all([f.path for f in ctx.files.rpms])
 
     inputs = list(ctx.files.rpms)
     if ctx.file.base_rpmdb:
         inputs.append(ctx.file.base_rpmdb)
+    if ctx.file.lockfile:
+        inputs.append(ctx.file.lockfile)
 
     ctx.actions.run(
         inputs = depset(inputs, transitive = [dnf5.files]),
@@ -35,6 +39,10 @@ rpm_mark = rule(
         "base_rpmdb": attr.label(
             allow_single_file = True,
             doc = "Optional base rpmdb file to mark packages on top of.",
+        ),
+        "lockfile": attr.label(
+            allow_single_file = True,
+            doc = "Optional lockfile JSON with install_order to register packages in topological order.",
         ),
         "out": attr.output(
             doc = "Optional output file. Defaults to <name>/rpmdb.sqlite.",

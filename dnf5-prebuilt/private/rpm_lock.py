@@ -303,19 +303,31 @@ def main():
                         direct_deps.add(other_name)
             dep_graph[name] = sorted(direct_deps)
 
-        # Transitive dependencies for topological sorting
-        trans_graph = {}
-        for name in resolved_pkgs:
-            trans = set()
-            stack = list(dep_graph.get(name, []))
-            while stack:
-                n = stack.pop()
-                if n not in trans:
-                    trans.add(n)
-                    stack.extend(dep_graph.get(n, []))
-            trans_graph[name] = sorted(trans)
+        # Transitive dependencies and topological sorting for install order
+        remaining_deps = {name: set(dep_graph.get(name, [])) & set(resolved_pkgs.keys()) for name in resolved_pkgs}
+        install_order = []
+        ready = sorted([name for name, deps in remaining_deps.items() if not deps])
+        while ready:
+            curr = ready.pop(0)
+            install_order.append(curr)
+            for name, deps in remaining_deps.items():
+                if curr in deps:
+                    deps.remove(curr)
+                    if not deps and name not in install_order and name not in ready:
+                        ready.append(name)
+                        ready.sort()
 
-        sorted_names = sorted(resolved_pkgs.keys(), key=lambda n: (len(trans_graph[n]), n))
+        # Handle any dependency cycles deterministically
+        while len(install_order) < len(resolved_pkgs):
+            remaining = [name for name in resolved_pkgs if name not in install_order]
+            remaining.sort(key=lambda n: (len(remaining_deps[n]), n))
+            curr = remaining[0]
+            install_order.append(curr)
+            for name, deps in remaining_deps.items():
+                if curr in deps:
+                    deps.remove(curr)
+
+        sorted_names = install_order
 
         output_packages = []
         for name in sorted_names:
@@ -347,6 +359,9 @@ def main():
             "version": 1,
             "arch": args.arch,
             "requested": sorted(args.packages),
+            "install_order": sorted_names,
+            "order": sorted_names,
+            "dependency_graph": {name: dep_graph.get(name, []) for name in sorted_names},
             "packages": output_packages,
         }
 

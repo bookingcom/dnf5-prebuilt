@@ -32,6 +32,11 @@ py_binary(
 )
 
 py_binary(
+    name = "rpm_merge",
+    srcs = ["rpm_merge.py"],
+)
+
+py_binary(
     name = "rpm_mark",
     srcs = ["rpm_mark.py"],
 )

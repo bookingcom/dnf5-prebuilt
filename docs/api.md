@@ -49,11 +49,11 @@ load(
 ### `rpm_layer`
 
 ```starlark
-rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpgkeys = [], **kwargs)
+rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpgkeys = [], lockfile = None, **kwargs)
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
-1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation).
+1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation and automatic topological ordering via lockfile).
 2. **Deduplication**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order.
 3. **RPM Database Injection** (optional): Injects an updated SQLite `rpmdb` under `/var/lib/rpm/rpmdb.sqlite`.
 4. **Compression** (optional): Compresses the layer archive using `gzip` or `zstd`.
@@ -69,6 +69,7 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 | `out` | `string` | `None` | Optional explicit output filename. Defaults to `<name>.tar` or `<name>.tar.{gz,zst}`. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures when `gpgcheck = True`. |
+| `lockfile` | `label` | `None` | Optional JSON lockfile (e.g. from `rpm_lock`) providing topological `install_order` to unpack RPMs in dependency order. |
 | `**kwargs` | `dict` | | Common rule attributes forwarded to the final rule (e.g. `visibility`, `tags`). |
 
 #### Example
@@ -93,10 +94,10 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], lockfile = None, rpmdb = None, out = None)
 ```
 
-Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
+Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `lockfile` is provided, orders the RPMs according to the lockfile's topological `install_order`. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
 
 #### Attributes
 
@@ -106,6 +107,7 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 | `rpms` | `list of labels` | *mandatory* | RPM package files (`.rpm`) to extract and merge. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
+| `lockfile` | `label` | `None` | Optional lockfile JSON containing topological `install_order`. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 
@@ -225,7 +227,10 @@ The generated JSON lockfile contains:
 - `version`: Lockfile schema version (currently `1`).
 - `arch`: Target architecture string.
 - `requested`: Array of requested package names.
-- `packages`: Array of resolved package objects in dependency order, each with:
+- `install_order`: Array of package names in topological installation order (Kahn's algorithm).
+- `order`: Alias array to `install_order`.
+- `dependency_graph`: Mapping of each package name to its resolved dependency package names.
+- `packages`: Array of resolved package objects in topological installation order, each with:
   - `name`: Package name.
   - `version`: Version-release (EVR).
   - `arch`: Architecture.
@@ -311,10 +316,10 @@ Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`
 ### `rpm_mark`
 
 ```starlark
-rpm_mark(name, rpms, base_rpmdb = None, out = None)
+rpm_mark(name, rpms, base_rpmdb = None, lockfile = None, out = None)
 ```
 
-Rule that records RPM packages into an SQLite `rpmdb` database without installing files or executing scripts, producing a reproducible `rpmdb.sqlite` with normalized timestamps (`SOURCE_DATE_EPOCH=0`).
+Rule that records RPM packages into an SQLite `rpmdb` database without installing files or executing scripts, producing a reproducible `rpmdb.sqlite` with normalized timestamps (`SOURCE_DATE_EPOCH=0`). When `lockfile` is provided, packages are registered in topological install order.
 
 #### Attributes
 
@@ -323,6 +328,7 @@ Rule that records RPM packages into an SQLite `rpmdb` database without installin
 | `name` | `string` | *mandatory* | Target name. |
 | `rpms` | `list of labels` | *mandatory* | RPM package files (`.rpm`) to record in the database. |
 | `base_rpmdb` | `label` | `None` | Optional base `rpmdb.sqlite` file to record packages on top of. |
+| `lockfile` | `label` | `None` | Optional lockfile JSON containing topological `install_order`. |
 | `out` | `output` | `None` | Optional output file name. Defaults to `<name>/rpmdb.sqlite`. |
 
 ---

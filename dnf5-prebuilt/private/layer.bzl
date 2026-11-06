@@ -9,11 +9,11 @@ def _rpm_merge_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ".tar"))
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
+    dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
 
     extra_inputs = []
     if ctx.attr.gpgcheck:
         keystore_dir = ctx.actions.declare_directory(ctx.label.name + "_gpg_keystore")
-        dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
 
         ks_args = ctx.actions.args()
         ks_args.add("--output", keystore_dir.path)
@@ -57,21 +57,23 @@ def _rpm_merge_impl(ctx):
             )
             extra_inputs.append(verified_marker)
 
+    merge_inputs = list(ctx.files.rpms) + extra_inputs
     args = ctx.actions.args()
-    args.add("-cf", out)
-    args.add("--format=pax")
-    args.add("--numeric-owner")
-    args.add("--owner=0")
-    args.add("--group=0")
+    args.add("--bsdtar", bsdtar.path)
+    args.add("--out", out.path)
+    if ctx.file.lockfile:
+        args.add("--lockfile", ctx.file.lockfile.path)
+        merge_inputs.append(ctx.file.lockfile)
+    args.add("--rpm-bin", dnf5.rpm.path)
     for rpm in ctx.files.rpms:
-        args.add("@" + rpm.path)
+        args.add("--rpm", rpm.path)
 
     ctx.actions.run(
         mnemonic = "RpmMerge",
         progress_message = "Merging RPMs into uncompressed archive %s" % out.short_path,
-        executable = bsdtar,
+        executable = ctx.executable._merge_tool,
         arguments = [args],
-        inputs = depset(ctx.files.rpms + extra_inputs, transitive = [tar_toolchain.default.files]),
+        inputs = depset(merge_inputs, transitive = [tar_toolchain.default.files, dnf5.files]),
         outputs = [out],
         env = tar_toolchain.tarinfo.default_env,
     )
@@ -89,6 +91,10 @@ rpm_merge = rule(
             allow_files = True,
             doc = "Optional list of GPG public key files.",
         ),
+        "lockfile": attr.label(
+            allow_single_file = True,
+            doc = "Optional lockfile JSON with install_order to unpack RPMs in topological order.",
+        ),
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
         "rpmdb": attr.label(
             allow_single_file = True,
@@ -101,6 +107,11 @@ rpm_merge = rule(
         ),
         "_keystore_tool": attr.label(
             default = Label("//dnf5-prebuilt/private:rpm_gpg_keystore"),
+            executable = True,
+            cfg = "exec",
+        ),
+        "_merge_tool": attr.label(
+            default = Label("//dnf5-prebuilt/private:rpm_merge"),
             executable = True,
             cfg = "exec",
         ),
@@ -241,11 +252,12 @@ def rpm_layer(
         out = None,
         gpgcheck = False,
         gpgkeys = [],
+        lockfile = None,
         **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
 
     Implements a multi-pass approach:
-    1. Merge all RPMs with bsdtar into an uncompressed archive (validating GPG signatures if gpgcheck is enabled).
+    1. Merge all RPMs with bsdtar into an uncompressed archive (validating GPG signatures if gpgcheck is enabled, ordering via lockfile if provided).
     2. Iterate over the entries and deduplicate directory and file paths with Python.
     3. Inject rpmdb into the archive (if rpmdb is specified).
     4. Compress the layer (if compress='gzip' or 'zstd' is specified).
@@ -258,6 +270,7 @@ def rpm_layer(
       out: Optional explicit output file name.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
       gpgkeys: Optional list of GPG public key files.
+      lockfile: Optional lockfile JSON containing topological install_order.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
     common_kwargs = propagate_common_rule_attributes(kwargs)
@@ -271,6 +284,7 @@ def rpm_layer(
         rpmdb = rpmdb,
         gpgcheck = gpgcheck,
         gpgkeys = gpgkeys,
+        lockfile = lockfile,
         out = name + "_raw.tar",
         **intermediate_kwargs
     )
