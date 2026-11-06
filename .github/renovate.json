@@ -3,5 +3,46 @@
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    ".worktrees/**",
+    "**/bazel/3rdparty/**"
+  ],
+  "bazel-module": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Ignore private Bzlmod dependencies hosted in the local registry bazel/3rdparty",
+      "matchManagers": ["bazel-module"],
+      "matchPackageNames": [
+        "json-c",
+        "libacl",
+        "libmodulemd",
+        "libpkgmanifest",
+        "librepo",
+        "libsmartcols",
+        "libsolv",
+        "popt",
+        "rpm",
+        "rpm-sequoia",
+        "toml11"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Ignore any Bzlmod manifests inside local registry",
+      "matchManagers": ["bazel-module"],
+      "matchFileNames": ["**/bazel/3rdparty/**"],
+      "enabled": false
+    },
+    {
+      "description": "Group non-major Bazel module dependencies together",
+      "matchManagers": ["bazel-module"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "bazel dependencies (non-major)"
+    }
   ]
 }
