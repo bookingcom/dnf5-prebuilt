@@ -30,6 +30,12 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux-amd64
+            ol10_image: ol10_curl_amd64_image
+            ol10_load_target: load_ol10_curl_amd64_image
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+            ol10_image: ol10_curl_arm64_image
+            ol10_load_target: load_ol10_curl_arm64_image
           - os: macos-15
             platform: darwin-arm64
     steps:
@@ -49,14 +55,29 @@ jobs:
         run: >
           bazel --bazelrc=../../.github/workflows/ci.bazelrc test //...
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
-      - name: Load container image into Docker
+      - name: Build Oracle Linux 10 container image
         if: runner.os == 'Linux'
+        working-directory: e2e/smoke_test
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc build //:${{ matrix.ol10_image }}
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Load Oracle Linux 10 container image into Docker
+        if: runner.os == 'Linux'
+        working-directory: e2e/smoke_test
+        run: >
+          bazel --bazelrc=../../.github/workflows/ci.bazelrc run //:${{ matrix.ol10_load_target }}
+          --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
+      - name: Run curl --version in Oracle Linux 10 container
+        if: runner.os == 'Linux'
+        run: docker run --network none --rm localhost/e2e-ol10-curl-test:latest curl --version
+      - name: Load OL9 container image into Docker
+        if: matrix.platform == 'linux-amd64'
         working-directory: e2e/smoke_test
         run: >
           bazel --bazelrc=../../.github/workflows/ci.bazelrc run //:load_ol9_curl_image
           --repo_env=DNF5_PREBUILT_DIST_DIR=${{ github.workspace }}/dist
-      - name: Validate container execution offline
-        if: runner.os == 'Linux'
+      - name: Validate OL9 container execution offline
+        if: matrix.platform == 'linux-amd64'
         working-directory: e2e/smoke_test
         run: ./validate_image.sh localhost/e2e-curl-test:latest
       - name: Collect artifacts
@@ -65,13 +86,16 @@ jobs:
           mkdir -p artifacts
           cp -f e2e/smoke_test/bazel-bin/*.lock.json artifacts/ || true
           cp -f e2e/smoke_test/bazel-bin/*rpmdb*.sqlite artifacts/ || true
-          docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
+          docker save -o artifacts/ol10_curl_image.tar localhost/e2e-ol10-curl-test:latest || true
+          if [ "${{ matrix.platform }}" = "linux-amd64" ]; then
+            docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
+          fi
           ls -la artifacts/
       - name: Upload e2e artifacts
         if: runner.os == 'Linux' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-artifacts
+          name: e2e-artifacts-${{ matrix.platform }}
           path: artifacts/
           if-no-files-found: warn
 

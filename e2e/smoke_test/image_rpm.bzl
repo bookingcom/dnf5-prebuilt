@@ -50,13 +50,20 @@ def extract_image_rpm_environment(
         )
         repo_labels.append(":" + target_name)
 
+    dnf_kwargs = dict(kwargs)
+    if "arch" not in dnf_kwargs:
+        if "arm64" in platform or "aarch64" in platform:
+            dnf_kwargs["arch"] = ["aarch64", "noarch"]
+        else:
+            dnf_kwargs["arch"] = ["x86_64", "noarch"]
+
     dnf_config(
         name = name + "_dnf_config",
         install_weak_deps = False,
         releasever = releasever,
         repo_configs = repo_labels,
         vars = vars,
-        **kwargs
+        **dnf_kwargs
     )
 
 def oraclelinux_9_environment(name = "ol9", image = "@oraclelinux_9_slim//:image", platform = "linux/amd64", **kwargs):
