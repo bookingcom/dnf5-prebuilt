@@ -109,6 +109,7 @@ rpm_mark(
 # Package RPM binaries and the updated rpmdb into an OCI layer tarball using public rpm_layer rule.
 rpm_layer(
     name = "ol9_curl_layer_tar",
+    gpgcheck = True,
     rpmdb = ":ol9_curl_rpmdb",
     rpms = OL9_CURL_RPMS,
 )
@@ -122,6 +123,7 @@ rpm_mark(
 
 rpm_layer(
     name = "ol10_curl_amd64_layer_tar",
+    gpgcheck = True,
     rpmdb = ":ol10_curl_amd64_rpmdb",
     rpms = OL10_CURL_AMD64_RPMS,
 )
@@ -134,6 +136,7 @@ rpm_mark(
 
 rpm_layer(
     name = "ol10_curl_arm64_layer_tar",
+    gpgcheck = True,
     rpmdb = ":ol10_curl_arm64_rpmdb",
     rpms = OL10_CURL_ARM64_RPMS,
 )

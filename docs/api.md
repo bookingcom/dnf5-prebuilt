@@ -49,11 +49,11 @@ load(
 ### `rpm_layer`
 
 ```starlark
-rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, **kwargs)
+rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpg_keys = [], **kwargs)
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
-1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk.
+1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation).
 2. **Deduplication**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order.
 3. **RPM Database Injection** (optional): Injects an updated SQLite `rpmdb` under `/var/lib/rpm/rpmdb.sqlite`.
 4. **Compression** (optional): Compresses the layer archive using `gzip` or `zstd`.
@@ -64,9 +64,11 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
 | `rpms` | `list of labels` | *mandatory* | List of RPM package files to merge into the layer. |
-| `rpmdb` | `label` | `None` | Optional updated SQLite `rpmdb` database file to inject into `/var/lib/rpm/rpmdb.sqlite`. |
+| `rpmdb` | `label` | `None` | Optional updated SQLite `rpmdb` database file to inject into `/var/lib/rpm/rpmdb.sqlite` and use as keystore source if `gpgcheck = True`. |
 | `compress` | `string` | `None` | Optional compression format: `"gzip"` (`.tar.gz`) or `"zstd"` (`.tar.zst`). Uncompressed tar when omitted. |
 | `out` | `string` | `None` | Optional explicit output filename. Defaults to `<name>.tar` or `<name>.tar.{gz,zst}`. |
+| `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
+| `gpg_keys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures when `gpgcheck = True`. |
 | `**kwargs` | `dict` | | Common rule attributes forwarded to the final rule (e.g. `visibility`, `tags`). |
 
 #### Example
@@ -76,6 +78,7 @@ load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_layer")
 
 rpm_layer(
     name = "curl_layer",
+    gpgcheck = True,
     rpmdb = ":base_with_curl_rpmdb",
     rpms = [
         "@libcurl_rpm//file",
@@ -90,10 +93,10 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpg_keys = [], rpmdb = None, out = None)
 ```
 
-Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode.
+Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
 
 #### Attributes
 
@@ -101,6 +104,9 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
 | `rpms` | `list of labels` | *mandatory* | RPM package files (`.rpm`) to extract and merge. |
+| `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
+| `gpg_keys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
+| `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 
 ---
