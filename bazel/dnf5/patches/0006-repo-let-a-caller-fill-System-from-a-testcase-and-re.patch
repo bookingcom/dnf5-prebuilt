@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dnf5-prebuilt <dnf5-prebuilt@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 11:00:00 +0100
+Subject: [PATCH] repo: let a caller fill @System from a testcase and refilter
+ modules
+
+RepoSack::create_system_repo_from_libsolv_testcase() loads the installed
+set from a libsolv testcase instead of an rpmdb, for solving on top of a
+set of packages that has no rpmdb (e.g. a lower container image layer).
+
+RepoSack::reapply_module_filtering() recomputes the modular filtering of
+the package sack after module streams were enabled or reset on a loaded
+sack, so that later queries see the new module state.
+
+Both are used by the lock command plugin of dnf5-prebuilt.
+---
+ include/libdnf5/repo/repo_sack.hpp | 10 ++++++++++
+ libdnf5/repo/repo_sack.cpp         | 11 +++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/include/libdnf5/repo/repo_sack.hpp b/include/libdnf5/repo/repo_sack.hpp
+index 91927cb..a72a1be 100644
+--- a/include/libdnf5/repo/repo_sack.hpp
++++ b/include/libdnf5/repo/repo_sack.hpp
+@@ -95,6 +95,16 @@ public:
+     /// @return The system repository.
+     libdnf5::repo::RepoWeakPtr get_system_repo();
+ 
++    /// Fills the system repository with the packages of a libsolv testcase file, as if they were installed. Used to
++    /// solve on top of a set of packages that has no rpmdb. Do not load the system repo from the rpmdb as well.
++    /// @param path The path to the libsolv testcase file
++    /// @return The system repository.
++    libdnf5::repo::RepoWeakPtr create_system_repo_from_libsolv_testcase(const std::string & path);
++
++    /// Recomputes the modular filtering of the package sack. Call it after enabling or resetting module streams on
++    /// an already loaded sack, so that later package queries see the new module state.
++    void reapply_module_filtering();
++
+     /// Add given paths to comdline repository.
+     /// @param paths Vector of paths to rpm files to be inserted to cmdline repo. Can contain paths to local files or URLs of remote rpm files. Specifications that are neither file paths, nor URLs are ignored.
+     /// @param calculate_checksum Whether libsolv should calculate and store checksum of added packages. Setting to true significantly reduces performance.
+diff --git a/libdnf5/repo/repo_sack.cpp b/libdnf5/repo/repo_sack.cpp
+index e4ef426..dbc0b64 100644
+--- a/libdnf5/repo/repo_sack.cpp
++++ b/libdnf5/repo/repo_sack.cpp
+@@ -328,6 +328,17 @@ RepoWeakPtr RepoSack::get_system_repo() {
+     return p_impl->system_repo->get_weak_ptr();
+ }
+ 
++RepoWeakPtr RepoSack::create_system_repo_from_libsolv_testcase(const std::string & path) {
++    auto repo = get_system_repo();
++    repo->add_libsolv_testcase(path);
++    p_impl->base->get_rpm_package_sack()->load_config_excludes_includes();
++    return repo;
++}
++
++void RepoSack::reapply_module_filtering() {
++    p_impl->base->get_module_sack()->p_impl->module_filtering();
++}
++
+ bool RepoSack::Impl::handle_repo_exception(const Repo * repo, std::exception_ptr ep, bool report_key_err) {
+     // Use an exception_ptr to preserve the original type of the exception, in case we re-throw it.
+     std::exception exception;

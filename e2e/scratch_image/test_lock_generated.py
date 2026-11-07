@@ -18,7 +18,7 @@ def validate_lock_file(path: str) -> None:
     if not isinstance(packages, list) or len(packages) == 0:
         raise ValueError(f"{path}: expected non-empty 'packages' list")
 
-    install_order = data.get("install_order") or data.get("order")
+    install_order = data.get("install_order")
     if not isinstance(install_order, list) or len(install_order) != len(packages):
         raise ValueError(f"{path}: expected valid 'install_order' array matching package count: {install_order}")
 

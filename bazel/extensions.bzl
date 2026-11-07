@@ -14,6 +14,7 @@ DNF5_PATCHES = [
     "0003-libdnf5-cli-fix-the-build-with-libc.patch",
     "0004-module-use-strictly-POSIX-extended-regular-expressio.patch",
     "0005-utils-report-arm64-Macs-as-aarch64-in-detect_arch.patch",
+    "0006-repo-let-a-caller-fill-System-from-a-testcase-and-re.patch",
 ]
 
 def _dnf5_extension_impl(mctx):

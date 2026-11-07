@@ -66,3 +66,16 @@ dnf5_toolchains_repository = repository_rule(
         "platforms": attr.string_list(),
     },
 )
+
+def _dnf5_lock_hub_repository_impl(rctx):
+    rctx.file("BUILD.bazel", rctx.attr.build_content)
+    rctx.file("defs.bzl", rctx.attr.defs_content)
+
+dnf5_lock_hub_repository = repository_rule(
+    implementation = _dnf5_lock_hub_repository_impl,
+    doc = "Exposes RPM targets in topological install_order from a parsed lockfile.",
+    attrs = {
+        "build_content": attr.string(mandatory = True),
+        "defs_content": attr.string(mandatory = True),
+    },
+)

@@ -3,11 +3,7 @@ load("@aspect_rules_py//py:defs.bzl", "py_binary")
 package(default_visibility = ["//dnf5-prebuilt:__subpackages__"])
 
 exports_files(
-    glob([
-        "*.bzl",
-        "*.patch",
-        "*.tpl",
-    ]),
+    glob(["*.bzl"]),
     visibility = ["//visibility:public"],
 )
 
@@ -32,21 +28,6 @@ py_binary(
 )
 
 py_binary(
-    name = "rpm_merge",
-    srcs = ["rpm_merge.py"],
-)
-
-py_binary(
     name = "rpm_mark",
     srcs = ["rpm_mark.py"],
-)
-
-py_binary(
-    name = "rpm_lock",
-    srcs = ["rpm_lock.py"],
-    dep_group = "dnf5-prebuilt",
-    deps = [
-        "@uv//repomd:pkg",
-        "@uv//zstandard:pkg",
-    ],
 )
