@@ -49,11 +49,11 @@ load(
 ### `rpm_layer`
 
 ```starlark
-rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpgkeys = [], lockfile = None, **kwargs)
+rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpgkeys = [], **kwargs)
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
-1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation and automatic topological ordering via lockfile).
+1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation).
 2. **Deduplication**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order.
 3. **RPM Database Injection** (optional): Injects an updated SQLite `rpmdb` under `/var/lib/rpm/rpmdb.sqlite`.
 4. **Compression** (optional): Compresses the layer archive using `gzip` or `zstd`.
@@ -63,13 +63,12 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
-| `rpms` | `list of labels` | *mandatory* | List of RPM package files to merge into the layer. |
+| `rpms` | `list of labels` | *mandatory* | List of RPM package files to merge into the layer (e.g. `@<lock_repo>//:rpms` exposed by `dnf5.lock`). |
 | `rpmdb` | `label` | `None` | Optional updated SQLite `rpmdb` database file to inject into `/var/lib/rpm/rpmdb.sqlite` and use as keystore source if `gpgcheck = True`. |
 | `compress` | `string` | `None` | Optional compression format: `"gzip"` (`.tar.gz`) or `"zstd"` (`.tar.zst`). Uncompressed tar when omitted. |
 | `out` | `string` | `None` | Optional explicit output filename. Defaults to `<name>.tar` or `<name>.tar.{gz,zst}`. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures when `gpgcheck = True`. |
-| `lockfile` | `label` | `None` | Optional JSON lockfile (e.g. from `rpm_lock`) providing topological `install_order` to unpack RPMs in dependency order. |
 | `**kwargs` | `dict` | | Common rule attributes forwarded to the final rule (e.g. `visibility`, `tags`). |
 
 #### Example
@@ -81,10 +80,7 @@ rpm_layer(
     name = "curl_layer",
     gpgcheck = True,
     rpmdb = ":base_with_curl_rpmdb",
-    rpms = [
-        "@libcurl_rpm//file",
-        "@curl_rpm//file",
-    ],
+    rpms = ["@curl_lock//:rpms"],
     compress = "gzip",
 )
 ```
@@ -94,10 +90,10 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], lockfile = None, rpmdb = None, out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, out = None)
 ```
 
-Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `lockfile` is provided, orders the RPMs according to the lockfile's topological `install_order`. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
+Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
 
 #### Attributes
 
@@ -107,7 +103,6 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 | `rpms` | `list of labels` | *mandatory* | RPM package files (`.rpm`) to extract and merge. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
-| `lockfile` | `label` | `None` | Optional lockfile JSON containing topological `install_order`. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 
@@ -179,8 +174,10 @@ rpm_lock(
     packages,
     config = None,
     base_rpmdb = None,
+    lock_files = [],
     arch = ["x86_64", "noarch"],
     releasever = None,
+    repo_config = None,
     repo_configs = [],
     repo_files = [],
     exclude = [],
@@ -195,7 +192,7 @@ rpm_lock(
 )
 ```
 
-Rule and executable that resolves dependencies using `dnf5` and generates a hermetic JSON lockfile. Supports multi-layer dependency solving on top of an existing container `base_rpmdb`.
+Rule and executable that resolves dependencies using `dnf5 lock` and generates a deterministic JSON lockfile. Supports multi-layer dependency solving on top of an existing container `base_rpmdb` and/or prior `lock_files`.
 
 Running `bazel run <target>` updates the lockfile in place in the source tree using `BUILD_WORKSPACE_DIRECTORY`.
 
@@ -205,8 +202,9 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
 | `packages` | `list of strings` | *mandatory* | List of package specs to resolve (names, NEVRAs, provides). |
-| `config` | `label` | `None` | Optional pre-rendered `dnf_config` target. When omitted, `releasever` and `repo_configs` must be provided. |
+| `config` | `label` | `None` | Optional pre-rendered `dnf_config` target. When omitted, `releasever` and `repo_configs` (or `repo_config`) must be provided. |
 | `base_rpmdb` | `label` | `None` | Optional base `rpmdb.sqlite` with already installed packages for multi-layer resolution. |
+| `lock_files` | `list of labels` | `[]` | Ordered list of lockfiles from previous layers whose packages are treated as already installed. |
 | `arch` | `list of strings` | `["x86_64", "noarch"]` | Target CPU architectures to resolve for. |
 | `releasever` | `string` | `None` | Distribution release version (e.g. `"9"`). |
 | `forcearch` | `string` | `""` | Override architecture passed to `--forcearch`. |
@@ -215,8 +213,9 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 | `module_enable` | `list of strings` | `[]` | Module streams to enable before resolving (`NAME:STREAM`). |
 | `module_platform_id` | `string` | `""` | Platform module (e.g. `'platform:el9'`) streams resolve against. |
 | `excludepkgs` | `list of strings` | `[]` | Package NEVRA globs hidden from solver (`excludepkgs=`). |
-| `exclude` | `list of strings` | `[]` | Package names or NEVRA globs to exclude from the dependency tree. |
+| `exclude` | `list of strings` | `[]` | Package names or NEVRA globs to exclude and prune from the dependency tree. |
 | `vars` | `dict of strings` | `{}` | Custom variables passed via `--setvar=NAME=VALUE`. |
+| `repo_config` | `label` | `None` | Optional single `.repo` configuration file. |
 | `repo_configs` | `list of labels` | `[]` | `.repo` configuration files. |
 | `repo_files` | `list of labels` | `[]` | Repository metadata files (repodata XMLs, signatures). |
 | `out` | `output` | `None` | Explicit output file. Defaults to `<name>.lock.json`. |
@@ -226,10 +225,8 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 The generated JSON lockfile contains:
 - `version`: Lockfile schema version (currently `1`).
 - `arch`: Target architecture string.
-- `requested`: Array of requested package names.
+- `requested`: Array of requested package specs.
 - `install_order`: Array of package names in topological installation order (Kahn's algorithm).
-- `order`: Alias array to `install_order`.
-- `dependency_graph`: Mapping of each package name to its resolved dependency package names.
 - `packages`: Array of resolved package objects in topological installation order, each with:
   - `name`: Package name.
   - `version`: Version-release (EVR).
@@ -239,13 +236,14 @@ The generated JSON lockfile contains:
   - `integrity`: Subresource Integrity string (`sha256-<base64>`).
   - `checksum`: Hexadecimal SHA-256 checksum.
   - `dependencies`: List of dependency package names in the closure.
-  - `recommends`: List of recommended package names (if any).
+  - `recommends`: List of recommended package names (omitted when empty).
 
 ```json
 {
   "version": 1,
   "arch": "x86_64,noarch",
   "requested": ["curl"],
+  "install_order": ["libcurl", "curl"],
   "packages": [
     {
       "name": "libcurl",
@@ -316,10 +314,10 @@ Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`
 ### `rpm_mark`
 
 ```starlark
-rpm_mark(name, rpms, base_rpmdb = None, lockfile = None, out = None)
+rpm_mark(name, rpms, base_rpmdb = None, out = None)
 ```
 
-Rule that records RPM packages into an SQLite `rpmdb` database without installing files or executing scripts, producing a reproducible `rpmdb.sqlite` with normalized timestamps (`SOURCE_DATE_EPOCH=0`). When `lockfile` is provided, packages are registered in topological install order.
+Rule that records RPM packages into an SQLite `rpmdb` database without installing files or executing scripts, producing a reproducible `rpmdb.sqlite` with normalized timestamps (`SOURCE_DATE_EPOCH=0`).
 
 #### Attributes
 
@@ -328,7 +326,6 @@ Rule that records RPM packages into an SQLite `rpmdb` database without installin
 | `name` | `string` | *mandatory* | Target name. |
 | `rpms` | `list of labels` | *mandatory* | RPM package files (`.rpm`) to record in the database. |
 | `base_rpmdb` | `label` | `None` | Optional base `rpmdb.sqlite` file to record packages on top of. |
-| `lockfile` | `label` | `None` | Optional lockfile JSON containing topological `install_order`. |
 | `out` | `output` | `None` | Optional output file name. Defaults to `<name>/rpmdb.sqlite`. |
 
 ---
@@ -389,6 +386,8 @@ Provider returned by `dnf5_toolchain` and `current_dnf5_toolchain`:
 
 Module extension defined in `@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl`.
 
+#### `dnf5.toolchains`
+
 ```starlark
 dnf5 = use_extension("@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl", "dnf5")
 dnf5.toolchains(name = "dnf5", version = "5.4.6.0")
@@ -400,3 +399,19 @@ register_toolchains("@dnf5_toolchains//:all")
 Fetches hermetic prebuilt distributions for Linux (`amd64`, `arm64`) and macOS (`amd64`, `arm64`).
 
 For testing local or unreleased builds, setting `--repo_env=DNF5_PREBUILT_DIST_DIR=/path` overrides download URLs to read tarballs from that directory without integrity checks.
+
+#### `dnf5.lock`
+
+```starlark
+dnf5.lock(
+    name = "curl_lock",
+    lockfile = "//:curl_lock.lock.json",
+)
+use_repo(dnf5, "curl_lock")
+```
+
+Reads a JSON lockfile produced by `rpm_lock`, creates an `http_file` repository for each locked RPM (verified by its `integrity` digest), and generates a hub repository `@<name>` exposing the RPMs in topological `install_order`:
+
+- `@<name>//:rpms`: `filegroup` containing all locked RPM files ordered by `install_order`, suitable for passing directly to `rpm_layer(rpms = ["@<name>//:rpms"])` and `rpm_mark(rpms = ["@<name>//:rpms"])`.
+- `@<name>//:<pkg>`: `alias` for each individual package in the lockfile.
+- `@<name>//:defs.bzl`: Starlark module exporting `RPMS` (ordered list of label strings) and `PACKAGES` (ordered list of package names).

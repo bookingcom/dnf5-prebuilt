@@ -4,73 +4,10 @@ load("@rules_img//img:layer.bzl", "layer_from_tar")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
-# Packages are deliberately listed in alphabetical order (not topological order)
-# to verify that rpm_merge / rpm_layer automatically uses the lockfile's install_order.
-OL10_AMD64_CURL_RPMS = [
-    "@ol10_curl_x86_64_rpm//file",
-    "@ol10_cyrus_sasl_lib_x86_64_rpm//file",
-    "@ol10_filesystem_x86_64_rpm//file",
-    "@ol10_glibc_common_x86_64_rpm//file",
-    "@ol10_glibc_x86_64_rpm//file",
-    "@ol10_keyutils_libs_x86_64_rpm//file",
-    "@ol10_krb5_libs_x86_64_rpm//file",
-    "@ol10_libbrotli_x86_64_rpm//file",
-    "@ol10_libcap_ng_x86_64_rpm//file",
-    "@ol10_libcap_x86_64_rpm//file",
-    "@ol10_libcbor_x86_64_rpm//file",
-    "@ol10_libcom_err_x86_64_rpm//file",
-    "@ol10_libcurl_x86_64_rpm//file",
-    "@ol10_libeconf_x86_64_rpm//file",
-    "@ol10_libevent_x86_64_rpm//file",
-    "@ol10_libfido2_x86_64_rpm//file",
-    "@ol10_libgcc_x86_64_rpm//file",
-    "@ol10_libidn2_x86_64_rpm//file",
-    "@ol10_libnghttp2_x86_64_rpm//file",
-    "@ol10_libpsl_x86_64_rpm//file",
-    "@ol10_libselinux_x86_64_rpm//file",
-    "@ol10_libsepol_x86_64_rpm//file",
-    "@ol10_libssh_x86_64_rpm//file",
-    "@ol10_libunistring_x86_64_rpm//file",
-    "@ol10_libxcrypt_x86_64_rpm//file",
-    "@ol10_openldap_x86_64_rpm//file",
-    "@ol10_openssl_libs_x86_64_rpm//file",
-    "@ol10_pcre2_x86_64_rpm//file",
-    "@ol10_systemd_libs_x86_64_rpm//file",
-    "@ol10_zlib_ng_compat_x86_64_rpm//file",
-]
-
-OL10_ARM64_CURL_RPMS = [
-    "@ol10_curl_aarch64_rpm//file",
-    "@ol10_cyrus_sasl_lib_aarch64_rpm//file",
-    "@ol10_filesystem_aarch64_rpm//file",
-    "@ol10_glibc_common_aarch64_rpm//file",
-    "@ol10_glibc_aarch64_rpm//file",
-    "@ol10_keyutils_libs_aarch64_rpm//file",
-    "@ol10_krb5_libs_aarch64_rpm//file",
-    "@ol10_libbrotli_aarch64_rpm//file",
-    "@ol10_libcap_ng_aarch64_rpm//file",
-    "@ol10_libcap_aarch64_rpm//file",
-    "@ol10_libcbor_aarch64_rpm//file",
-    "@ol10_libcom_err_aarch64_rpm//file",
-    "@ol10_libcurl_aarch64_rpm//file",
-    "@ol10_libeconf_aarch64_rpm//file",
-    "@ol10_libevent_aarch64_rpm//file",
-    "@ol10_libfido2_aarch64_rpm//file",
-    "@ol10_libgcc_aarch64_rpm//file",
-    "@ol10_libidn2_aarch64_rpm//file",
-    "@ol10_libnghttp2_aarch64_rpm//file",
-    "@ol10_libpsl_aarch64_rpm//file",
-    "@ol10_libselinux_aarch64_rpm//file",
-    "@ol10_libsepol_aarch64_rpm//file",
-    "@ol10_libssh_aarch64_rpm//file",
-    "@ol10_libunistring_aarch64_rpm//file",
-    "@ol10_libxcrypt_aarch64_rpm//file",
-    "@ol10_openldap_aarch64_rpm//file",
-    "@ol10_openssl_libs_aarch64_rpm//file",
-    "@ol10_pcre2_aarch64_rpm//file",
-    "@ol10_systemd_libs_aarch64_rpm//file",
-    "@ol10_zlib_ng_compat_aarch64_rpm//file",
-]
+exports_files([
+    "ol10_scratch_curl_amd64_lock.lock.json",
+    "ol10_scratch_curl_arm64_lock.lock.json",
+])
 
 # DNF configuration for OL10
 dnf_config(
@@ -140,34 +77,31 @@ sh_test(
 )
 
 # Oracle Linux 10: amd64 and arm64 curl rpmdb and layer targets on scratch
+# Topologically ordered RPM labels are exposed by the Bzlmod extension repositories.
 rpm_mark(
     name = "ol10_scratch_curl_amd64_rpmdb",
-    lockfile = ":ol10_scratch_curl_amd64_lock",
-    rpms = OL10_AMD64_CURL_RPMS,
+    rpms = ["@ol10_scratch_curl_amd64//:rpms"],
 )
 
 rpm_layer(
     name = "ol10_scratch_curl_amd64_layer_tar",
     gpgcheck = True,
     gpgkeys = ["@ol10_gpg_key//file"],
-    lockfile = ":ol10_scratch_curl_amd64_lock",
     rpmdb = ":ol10_scratch_curl_amd64_rpmdb",
-    rpms = OL10_AMD64_CURL_RPMS,
+    rpms = ["@ol10_scratch_curl_amd64//:rpms"],
 )
 
 rpm_mark(
     name = "ol10_scratch_curl_arm64_rpmdb",
-    lockfile = ":ol10_scratch_curl_arm64_lock",
-    rpms = OL10_ARM64_CURL_RPMS,
+    rpms = ["@ol10_scratch_curl_arm64//:rpms"],
 )
 
 rpm_layer(
     name = "ol10_scratch_curl_arm64_layer_tar",
     gpgcheck = True,
     gpgkeys = ["@ol10_gpg_key//file"],
-    lockfile = ":ol10_scratch_curl_arm64_lock",
     rpmdb = ":ol10_scratch_curl_arm64_rpmdb",
-    rpms = OL10_ARM64_CURL_RPMS,
+    rpms = ["@ol10_scratch_curl_arm64//:rpms"],
 )
 
 # Build OCI layer and image manifest on top of scratch base
