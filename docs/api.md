@@ -220,6 +220,8 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 
 #### Lockfile Schema
 
+See [Lockfile Specification (`docs/lockfile-spec.md`)](lockfile-spec.md) for the complete specification.
+
 The generated JSON lockfile contains:
 - `version`: Lockfile schema version (currently `1`).
 - `arch`: Target architecture string.
