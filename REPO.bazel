@@ -4,6 +4,4 @@ ignore_directories([
     ".worktrees/*",
     ".worktrees/**",
     "bazel/3rdparty",
-    "e2e/*",
-    "e2e/**",
 ])

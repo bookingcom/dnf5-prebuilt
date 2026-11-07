@@ -1,5 +1,5 @@
 load("//bazel:extensions.bzl", "DNF5_VERSION")
-load(":dist.bzl", "dnf5_distribution", "dnf5_multiplatform_distribution")
+load(":dist.bzl", "dnf5_dist_dir", "dnf5_distribution", "dnf5_multiplatform_distribution")
 
 # Relocatable dnf5 distribution for the target platform:
 #
@@ -91,5 +91,11 @@ dnf5_multiplatform_distribution(
     name = "dist",
     target = ":dnf5",
     version = DNF5_VERSION,
+    visibility = ["//visibility:public"],
+)
+
+dnf5_dist_dir(
+    name = "dist_dir",
+    dist = ":dist",
     visibility = ["//visibility:public"],
 )

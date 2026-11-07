@@ -1,4 +1,11 @@
 .worktrees
 bazel/3rdparty
-e2e/smoke_test
-e2e/scratch_image
+e2e/smoke_test/bazel-bin
+e2e/smoke_test/bazel-out
+e2e/smoke_test/bazel-smoke_test
+e2e/smoke_test/bazel-testlogs
+e2e/scratch_image/bazel-bin
+e2e/scratch_image/bazel-out
+e2e/scratch_image/bazel-scratch_image
+e2e/scratch_image/bazel-testlogs
+

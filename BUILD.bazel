@@ -1,1 +1,14 @@
 exports_files(["LICENSE"])
+
+filegroup(
+    name = "local_repository_files",
+    srcs = [
+        "BUILD.bazel",
+        "LICENSE",
+        "MODULE.bazel",
+        "REPO.bazel",
+        "//dnf5-prebuilt:all_files",
+        "//dnf5-prebuilt/private:all_files",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -172,3 +172,30 @@ dnf5_multiplatform_distribution = rule(
         ),
     },
 )
+
+def _dnf5_dist_dir_impl(ctx):
+    out = ctx.actions.declare_directory(ctx.label.name)
+    files = ctx.files.dist
+    ctx.actions.run_shell(
+        inputs = files,
+        outputs = [out],
+        command = """
+            mkdir -p "$1"
+            for f in "${@:2}"; do
+                cp -f "$f" "$1/$(basename "$f")"
+            done
+        """,
+        arguments = [out.path] + [f.path for f in files],
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+dnf5_dist_dir = rule(
+    implementation = _dnf5_dist_dir_impl,
+    doc = "Collects distribution archives into a single directory artifact suitable for DNF5_PREBUILT_DIST_DIR.",
+    attrs = {
+        "dist": attr.label(
+            mandatory = True,
+            doc = "The dist target producing distribution archives.",
+        ),
+    },
+)
