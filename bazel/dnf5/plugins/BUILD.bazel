@@ -16,8 +16,6 @@ filegroup(
         "lock.cpp",
         "lock.hpp",
         "lock_cmd_plugin.cpp",
-        "lock_layers.cpp",
-        "lock_layers.hpp",
     ],
     visibility = ["@dnf5//:__pkg__"],
 )

@@ -3,7 +3,7 @@
 load("//dnf5-prebuilt/private:config.bzl", "DNF5_TOOLCHAIN", "SOLVER_ATTRS", "dnf5_script", "render_dnf_config", "solver_settings")
 load("//dnf5-prebuilt/private:providers.bzl", "DnfConfigInfo", "RpmLockFileInfo")
 
-def _dnf5_lock_args(ctx, info, arch, forcearch, releasever, module_enable, all_vars, base_rpmdb, lock_files):
+def _dnf5_lock_args(ctx, info, arch, forcearch, releasever, module_enable, all_vars, base_rpmdb):
     """Arguments of `dnf5 lock` and any overrides not already in `info`."""
     args = ["--archlist=" + ",".join(arch)]
     if ctx.attr.config:
@@ -26,7 +26,8 @@ def _dnf5_lock_args(ctx, info, arch, forcearch, releasever, module_enable, all_v
     args += ["--module-enable=" + spec for spec in module_enable]
     if base_rpmdb:
         args.append("--base-rpmdb=" + base_rpmdb)
-    args += ["--lockfile=" + lf for lf in lock_files]
+    if ctx.attr.debug:
+        args.append("--debug")
     return args + ctx.attr.packages
 
 def _rpm_lock_impl(ctx):
@@ -42,10 +43,8 @@ def _rpm_lock_impl(ctx):
         module_enable = ctx.attr.module_enable or info.module_enable
     else:
         repo_configs = list(ctx.files.repo_configs)
-        if ctx.file.repo_config:
-            repo_configs.append(ctx.file.repo_config)
         if not repo_configs:
-            fail("When 'config' is not specified, 'repo_configs' (or 'repo_config') must be provided.")
+            fail("When 'config' is not specified, 'repo_configs' must be provided.")
         releasever = ctx.attr.releasever or "9"
         settings = solver_settings(ctx.attr)
         settings["releasever"] = releasever
@@ -79,10 +78,9 @@ def _rpm_lock_impl(ctx):
         module_enable,
         all_vars,
         ctx.file.base_rpmdb.path if ctx.file.base_rpmdb else None,
-        [lf.path for lf in ctx.files.lock_files],
     ))
 
-    inputs = list(ctx.files.lock_files)
+    inputs = []
     if ctx.file.base_rpmdb:
         inputs.append(ctx.file.base_rpmdb)
 
@@ -111,7 +109,6 @@ def _rpm_lock_impl(ctx):
         module_enable,
         all_vars,
         ctx.file.base_rpmdb.short_path if ctx.file.base_rpmdb else None,
-        [lf.short_path for lf in ctx.files.lock_files],
     )
     dest_path = (ctx.label.package + "/" + out_dest) if ctx.label.package else out_dest
 
@@ -133,7 +130,7 @@ echo "Lockfile updated at: ${DEST}"
         " ".join(["'%s'" % a for a in run_args]),
     ), is_executable = True)
 
-    runfiles_files = [out, solve] + list(ctx.files.lock_files)
+    runfiles_files = [out, solve]
     if ctx.file.base_rpmdb:
         runfiles_files.append(ctx.file.base_rpmdb)
 
@@ -168,12 +165,12 @@ _RPM_LOCK_ATTRS.update({
         allow_single_file = True,
         doc = "Optional base rpmdb file containing already installed packages.",
     ),
+    "debug": attr.bool(
+        default = False,
+        doc = "Include debugging fields (dependencies, transitive_dependencies, recommends, supplements) in the lockfile.",
+    ),
     "exclude": attr.string_list(
         doc = "Optional packages to exclude and prune from the dependency tree.",
-    ),
-    "lock_files": attr.label_list(
-        allow_files = [".json"],
-        doc = "Ordered list of lock files from previous layers.",
     ),
     "out": attr.output(
         doc = "Output JSON lockfile name.",
@@ -185,10 +182,6 @@ _RPM_LOCK_ATTRS.update({
     ),
     "releasever": attr.string(
         doc = "Distribution release version (--releasever), e.g. '9'.",
-    ),
-    "repo_config": attr.label(
-        allow_single_file = [".repo", ".conf"],
-        doc = "Optional single .repo configuration file.",
     ),
     "repo_configs": attr.label_list(
         allow_files = [".repo", ".conf"],

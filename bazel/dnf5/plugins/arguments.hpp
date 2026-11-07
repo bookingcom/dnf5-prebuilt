@@ -48,6 +48,32 @@ void add_value_option(
     cmd.register_named_arg(arg);
 }
 
+// Registers the boolean flag --NAME, also -SHORT_NAME unless that is 0; `store` is called when present.
+template <typename Store>
+void add_flag_option(
+    libdnf5::cli::ArgumentParser & parser,
+    libdnf5::cli::ArgumentParser::Command & cmd,
+    const char * name,
+    char short_name,
+    const char * description,
+    Store store) {
+    auto * arg = parser.add_new_named_arg(name);
+    arg->set_long_name(name);
+    if (short_name) {
+        arg->set_short_name(short_name);
+    }
+    arg->set_has_value(false);
+    arg->set_description(description);
+    arg->set_parse_hook_func([store](
+                                 [[maybe_unused]] libdnf5::cli::ArgumentParser::NamedArg * arg,
+                                 [[maybe_unused]] const char * option,
+                                 [[maybe_unused]] const char * value) {
+        store();
+        return true;
+    });
+    cmd.register_named_arg(arg);
+}
+
 // Registers the positional package-spec arguments; `store` receives each one.
 template <typename Store>
 void add_specs_arg(
