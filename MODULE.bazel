@@ -12,7 +12,7 @@ bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
 
 bazel_dep(name = "bazel_lib", version = "3.7.2")
 
-bazel_dep(name = "rules_cc", version = "0.2.26", dev_dependency = True)
+bazel_dep(name = "rules_cc", version = "0.2.27", dev_dependency = True)
 bazel_dep(name = "rules_shell", version = "0.8.0", dev_dependency = True)
 
 bazel_dep(name = "tar.bzl", version = "0.10.9")
@@ -68,7 +68,7 @@ osx.frameworks(names = [
 
 # Hermetic Rust toolchain (rpm-sequoia) via rules_rs, linking with the LLVM
 # toolchain above.
-bazel_dep(name = "rules_rs", version = "0.1.3", dev_dependency = True)
+bazel_dep(name = "rules_rs", version = "0.2.1", dev_dependency = True)
 
 rust_toolchains = use_extension(
     "@rules_rs//rs/toolchains:module_extension.bzl",
@@ -111,11 +111,11 @@ rbe_container_image(
 # BCR live in the local registry under bazel/3rdparty. All of them are dev-only:
 # consumers of the dnf5-prebuilt ruleset download prebuilt binaries instead.
 bazel_dep(name = "toml11", version = "4.4.0", dev_dependency = True)
-bazel_dep(name = "curl", version = "8.22.0.bcr.1", dev_dependency = True)
+bazel_dep(name = "curl", version = "8.22.0.bcr.3", dev_dependency = True)
 bazel_dep(name = "fmt", version = "12.2.0.bcr.1", dev_dependency = True)
 bazel_dep(name = "glib", version = "2.84.4", dev_dependency = True)
-bazel_dep(name = "libxml2", version = "2.15.3", dev_dependency = True)
-bazel_dep(name = "openssl", version = "4.0.1.bcr.2", dev_dependency = True)
+bazel_dep(name = "libxml2", version = "2.15.4", dev_dependency = True)
+bazel_dep(name = "openssl", version = "4.0.3.bcr.1", dev_dependency = True)
 bazel_dep(name = "sqlite3", version = "3.53.4", dev_dependency = True)
 bazel_dep(name = "zlib", version = "1.3.2.bcr.3", dev_dependency = True)
 bazel_dep(name = "json-c", version = "0.19", dev_dependency = True)
