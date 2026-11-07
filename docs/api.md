@@ -174,10 +174,8 @@ rpm_lock(
     packages,
     config = None,
     base_rpmdb = None,
-    lock_files = [],
     arch = ["x86_64", "noarch"],
     releasever = None,
-    repo_config = None,
     repo_configs = [],
     repo_files = [],
     exclude = [],
@@ -188,11 +186,12 @@ rpm_lock(
     module_platform_id = "",
     excludepkgs = [],
     vars = {},
+    debug = False,
     out = None,
 )
 ```
 
-Rule and executable that resolves dependencies using `dnf5 lock` and generates a deterministic JSON lockfile. Supports multi-layer dependency solving on top of an existing container `base_rpmdb` and/or prior `lock_files`.
+Rule and executable that resolves dependencies using `dnf5 lock` and generates a deterministic JSON lockfile. Supports multi-layer dependency solving on top of an existing container `base_rpmdb`.
 
 Running `bazel run <target>` updates the lockfile in place in the source tree using `BUILD_WORKSPACE_DIRECTORY`.
 
@@ -202,9 +201,8 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
 | `packages` | `list of strings` | *mandatory* | List of package specs to resolve (names, NEVRAs, provides). |
-| `config` | `label` | `None` | Optional pre-rendered `dnf_config` target. When omitted, `releasever` and `repo_configs` (or `repo_config`) must be provided. |
+| `config` | `label` | `None` | Optional pre-rendered `dnf_config` target. When omitted, `releasever` and `repo_configs` must be provided. |
 | `base_rpmdb` | `label` | `None` | Optional base `rpmdb.sqlite` with already installed packages for multi-layer resolution. |
-| `lock_files` | `list of labels` | `[]` | Ordered list of lockfiles from previous layers whose packages are treated as already installed. |
 | `arch` | `list of strings` | `["x86_64", "noarch"]` | Target CPU architectures to resolve for. |
 | `releasever` | `string` | `None` | Distribution release version (e.g. `"9"`). |
 | `forcearch` | `string` | `""` | Override architecture passed to `--forcearch`. |
@@ -215,9 +213,9 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 | `excludepkgs` | `list of strings` | `[]` | Package NEVRA globs hidden from solver (`excludepkgs=`). |
 | `exclude` | `list of strings` | `[]` | Package names or NEVRA globs to exclude and prune from the dependency tree. |
 | `vars` | `dict of strings` | `{}` | Custom variables passed via `--setvar=NAME=VALUE`. |
-| `repo_config` | `label` | `None` | Optional single `.repo` configuration file. |
 | `repo_configs` | `list of labels` | `[]` | `.repo` configuration files. |
 | `repo_files` | `list of labels` | `[]` | Repository metadata files (repodata XMLs, signatures). |
+| `debug` | `bool` | `False` | Include debugging fields (`dependencies`, `transitive_dependencies`, `recommends`, `supplements`) in the lockfile. |
 | `out` | `output` | `None` | Explicit output file. Defaults to `<name>.lock.json`. |
 
 #### Lockfile Schema
@@ -225,18 +223,16 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 The generated JSON lockfile contains:
 - `version`: Lockfile schema version (currently `1`).
 - `arch`: Target architecture string.
-- `requested`: Array of requested package specs.
+- `requested`: Array of requested package names.
 - `install_order`: Array of package names in topological installation order (Kahn's algorithm).
 - `packages`: Array of resolved package objects in topological installation order, each with:
   - `name`: Package name.
   - `version`: Version-release (EVR).
   - `arch`: Architecture.
-  - `nevra`: Canonical NEVRA string.
   - `url`: Download URL resolved from repodata.
   - `integrity`: Subresource Integrity string (`sha256-<base64>`).
-  - `checksum`: Hexadecimal SHA-256 checksum.
-  - `dependencies`: List of dependency package names in the closure.
-  - `recommends`: List of recommended package names (omitted when empty).
+  - `requested`: Present and `true` only when the package was directly requested.
+  - When `debug = True` (`--debug`), each package object additionally includes `dependencies`, `transitive_dependencies`, `recommends` (if non-empty), and `supplements` (if non-empty).
 
 ```json
 {
@@ -249,21 +245,16 @@ The generated JSON lockfile contains:
       "name": "libcurl",
       "version": "8.7.1-1.el9",
       "arch": "x86_64",
-      "nevra": "libcurl-8.7.1-1.el9.x86_64",
       "url": "https://mirror.example.com/Packages/l/libcurl-8.7.1-1.el9.x86_64.rpm",
-      "integrity": "sha256-abc...",
-      "checksum": "1234abcd...",
-      "dependencies": []
+      "integrity": "sha256-abc..."
     },
     {
       "name": "curl",
       "version": "8.7.1-1.el9",
       "arch": "x86_64",
-      "nevra": "curl-8.7.1-1.el9.x86_64",
       "url": "https://mirror.example.com/Packages/c/curl-8.7.1-1.el9.x86_64.rpm",
       "integrity": "sha256-xyz...",
-      "checksum": "5678cdef...",
-      "dependencies": ["libcurl"]
+      "requested": true
     }
   ]
 }

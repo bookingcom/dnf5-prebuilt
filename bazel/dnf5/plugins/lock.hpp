@@ -23,13 +23,13 @@ private:
     std::string output;
     /// Base rpmdb.sqlite file to load installed packages from.
     std::string base_rpmdb;
+    /// Include debugging fields (dependencies, transitive_dependencies, recommends, supplements).
+    bool debug = false;
     /// Architectures a package may have.
     std::vector<std::string> archlist;
     /// Packages to prune from the dependency tree (dnf5 has a global --exclude of its own, which hides them instead).
     std::vector<std::string> prune;
     std::vector<std::string> module_enable;
-    /// Lockfiles of the layers below, in order.
-    std::vector<std::string> lockfiles;
     std::vector<std::string> specs;
 };
 

@@ -5,11 +5,7 @@ bazel_dep(name = "dnf5-prebuilt", version = "...")
 
 dnf5 = use_extension("@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl", "dnf5")
 dnf5.toolchains()
-dnf5.lock(
-    name = "ol10_curl_amd64",
-    lockfile = "//:ol10_scratch_curl_amd64_lock.lock.json",
-)
-use_repo(dnf5, "dnf5_toolchains", "ol10_curl_amd64")
+use_repo(dnf5, "dnf5_toolchains")
 
 register_toolchains("@dnf5_toolchains//:all")
 ```
@@ -101,10 +97,9 @@ def _process_lock_tag(mctx, tag):
     alias_rules = []
     for pkg in ordered_pkgs:
         pkg_name = pkg["name"]
-        nevra = pkg.get("nevra") or ("%s-%s.%s" % (pkg_name, pkg.get("version", "0"), pkg.get("arch", "noarch")))
+        nevra = "%s-%s.%s" % (pkg_name, pkg.get("version", "0"), pkg.get("arch", "noarch"))
         url = pkg["url"]
-        integrity = pkg.get("integrity", "")
-        checksum = pkg.get("checksum", "")
+        integrity = pkg["integrity"]
 
         url_base = url.rsplit("/", 1)[-1] if "/" in url else ""
         if url_base.endswith(".rpm") and ":" not in url_base:
@@ -113,16 +108,12 @@ def _process_lock_tag(mctx, tag):
             downloaded_file_path = (nevra + ".rpm").replace(":", "_")
 
         repo_name = "%s__%s" % (tag.name, _sanitize_repo_name(pkg_name))
-        http_kwargs = {
-            "name": repo_name,
-            "downloaded_file_path": downloaded_file_path,
-            "urls": [url],
-        }
-        if integrity:
-            http_kwargs["integrity"] = integrity
-        elif checksum:
-            http_kwargs["sha256"] = checksum
-        http_file(**http_kwargs)
+        http_file(
+            name = repo_name,
+            downloaded_file_path = downloaded_file_path,
+            integrity = integrity,
+            urls = [url],
+        )
 
         label_str = "@%s//file" % repo_name
         rpm_labels.append(label_str)

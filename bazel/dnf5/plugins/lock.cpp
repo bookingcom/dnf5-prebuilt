@@ -1,7 +1,6 @@
 #include "lock.hpp"
 
 #include "arguments.hpp"
-#include "lock_layers.hpp"
 
 #include <glib.h>
 #include <json-c/json.h>
@@ -196,20 +195,31 @@ std::string package_url(const Package & pkg) {
     return base.empty() ? location : join_url(base, location);
 }
 
-struct Providers {
-    NameSet names;
-    NameSet nevras;
-};
+std::string integrity_of(const Package & pkg) {
+    auto checksum = pkg.get_checksum();
+    auto hex = checksum.get_checksum();
+    if (hex.empty()) {
+        return "";
+    }
+    std::string raw;
+    for (size_t i = 0; i + 1 < hex.size(); i += 2) {
+        raw.push_back(static_cast<char>(std::stoi(hex.substr(i, 2), nullptr, 16)));
+    }
+    gchar * b64 = g_base64_encode(reinterpret_cast<const guchar *>(raw.data()), raw.size());
+    std::string integrity = checksum.get_type_str() + "-" + b64;
+    g_free(b64);
+    return integrity;
+}
 
 // The packages that provide any of `deps`, other than `self`, when they are part of the lock (`locked`, by id) or of a
-// layer below (`installed`, by name).
-Providers providers_of(
+// base rpmdb (`installed`, by name).
+NameSet providers_of(
     libdnf5::Base & base,
     const libdnf5::rpm::ReldepList & deps,
     const std::string & self,
     const std::set<libdnf5::rpm::PackageId> & locked,
     const NameSet & installed) {
-    Providers result;
+    NameSet result;
     PackageQuery query(base);
     query.filter_provides(deps);
     for (const auto & prov : query) {
@@ -217,8 +227,7 @@ Providers providers_of(
         if ((!locked.count(prov.get_id()) && !installed.count(name)) || name == self) {
             continue;
         }
-        result.names.insert(name);
-        result.nevras.insert(prov.get_nevra());
+        result.insert(name);
     }
     return result;
 }
@@ -261,7 +270,6 @@ json_object * package_object(const Package & pkg) {
     add_string(obj, "name", pkg.get_name());
     add_string(obj, "version", pkg.get_evr());
     add_string(obj, "arch", pkg.get_arch());
-    add_string(obj, "nevra", pkg.get_nevra());
     return obj;
 }
 
@@ -320,19 +328,18 @@ void LockCommand::set_argument_parser() {
     add_value_option(
         parser,
         cmd,
-        "lockfile",
-        'l',
-        "FILE,...",
-        _("Lockfiles of the layers below this one, in order"),
-        [this](const char * v) { append_list(lockfiles, v); });
-    add_value_option(
-        parser,
-        cmd,
         "base-rpmdb",
         0,
         "FILE",
         _("SQLite rpmdb of the base layer to solve on top of"),
         [this](const char * v) { base_rpmdb = v; });
+    add_flag_option(
+        parser,
+        cmd,
+        "debug",
+        0,
+        _("Include debugging fields (dependencies, transitive_dependencies, recommends, supplements)"),
+        [this]() { debug = true; });
 }
 
 void LockCommand::configure() {
@@ -360,7 +367,6 @@ void LockCommand::configure() {
         }
         get_context().set_load_system_repo(true);
     } else {
-        // The installed set comes from the lockfiles of the layers below, not from an rpmdb.
         get_context().set_load_system_repo(false);
     }
     get_context().set_load_available_repos(Context::LoadAvailableRepos::ENABLED);
@@ -374,7 +380,7 @@ void LockCommand::run() {
     const bool best = base.get_config().get_best_option().get_value();
     const bool weak_deps = base.get_config().get_install_weak_deps_option().get_value();
 
-    // Enabling a stream takes a resolve of its own: it filters the packages of the other streams out of the queries below.
+    // Enabling a stream takes a resolve of its own so modular metadata is processed before resolving package specs.
     if (!module_enable.empty()) {
         libdnf5::Goal module_goal(base);
         for (const auto & spec : module_enable) {
@@ -382,34 +388,14 @@ void LockCommand::run() {
         }
         auto module_transaction = module_goal.resolve();
         require_resolved(module_transaction);
-        base.get_repo_sack()->reapply_module_filtering();
     }
 
-    // What the layers below hold.
-    const auto installonly = base.get_config().get_installonlypkgs_option().get_value();
-    Layers layers;
-    for (const auto & lockfile : lockfiles) {
-        load_lockfile(lockfile, installonly, layers);
-    }
-    // The architectures of the first layer that names some, unless --archlist says otherwise.
     std::string arch_text;
-    if (archlist.empty()) {
-        arch_text = layers.arch.value_or("");
-        auto layer_archs = arch_text;
-        std::replace(layer_archs.begin(), layer_archs.end(), ' ', ',');
-        append_list(archlist, layer_archs.c_str());
-    } else {
-        for (const auto & arch : archlist) {
-            arch_text += (arch_text.empty() ? "" : ",") + arch;
-        }
+    for (const auto & arch : archlist) {
+        arch_text += (arch_text.empty() ? "" : ",") + arch;
     }
-    if (!layers.order.empty()) {
-        load_system_repo(base, layers, archlist);
-    }
+
     NameSet installed;
-    for (const auto & [name, pkg] : layers.by_name) {
-        installed.insert(name);
-    }
     if (!base_rpmdb.empty()) {
         PackageQuery sys_query(base);
         sys_query.filter_installed();
@@ -466,8 +452,6 @@ void LockCommand::run() {
         throw libdnf5::cli::CommandExitError(1, M_("No packages matched the specified criteria"));
     }
 
-    // A package of a layer below that the repositories do not replace with a newer or another build. The integrity
-    // tells builds apart only at the same version: a layer package newer than `pkg` is held, an older one is not.
     auto held = [&](const Package & pkg) {
         if (!base_rpmdb.empty()) {
             // Directly requested packages should still be resolved and locked even if already in base_rpmdb,
@@ -485,17 +469,7 @@ void LockCommand::run() {
                 }
             }
         }
-        auto inst = layers.find(pkg, installonly);
-        if (!inst) {
-            return false;
-        }
-        if (inst->version) {
-            int cmp = evrcmp_str(*inst->version, pkg);
-            if (cmp != 0) {
-                return cmp > 0;
-            }
-        }
-        return !integrity_differs(inst->integrity, pkg);
+        return false;
     };
 
     std::vector<Package> all_pkgs;
@@ -586,7 +560,7 @@ void LockCommand::run() {
         }
     }
 
-    std::map<std::string, Providers> direct;
+    std::map<std::string, NameSet> direct;
     // Weak edges (Recommends, reverse Supplements), only followed to find what to trim; they stay out of "dependencies"
     // as the package does not require them.
     std::map<std::string, NameSet> weak;
@@ -594,10 +568,10 @@ void LockCommand::run() {
         auto name = pkg.get_name();
         direct[name] = providers_of(base, pkg.get_requires(), name, locked, installed);
         if (trim && weak_deps) {
-            for (const auto & prov : providers_of(base, pkg.get_recommends(), name, locked, {}).names) {
+            for (const auto & prov : providers_of(base, pkg.get_recommends(), name, locked, {})) {
                 weak[name].insert(prov);
             }
-            for (const auto & prov : providers_of(base, pkg.get_supplements(), name, locked, {}).names) {
+            for (const auto & prov : providers_of(base, pkg.get_supplements(), name, locked, {})) {
                 weak[prov].insert(name);
             }
         }
@@ -628,7 +602,7 @@ void LockCommand::run() {
     while (!queue.empty()) {
         auto current = queue.front();
         queue.pop_front();
-        for (const auto * edges : {&direct[current].names, &weak[current]}) {
+        for (const auto * edges : {&direct[current], &weak[current]}) {
             for (const auto & dep : *edges) {
                 if (!pruned.count(dep) && locked_names.count(dep)) {
                     reach(dep);
@@ -648,7 +622,7 @@ void LockCommand::run() {
     auto kept = [&](const std::string & dep) { return reachable.count(dep) || installed.count(dep); };
     std::map<std::string, NameSet> kept_deps;
     for (const auto & name : reachable) {
-        for (const auto & dep : direct[name].names) {
+        for (const auto & dep : direct[name]) {
             if (kept(dep)) {
                 kept_deps[name].insert(dep);
             }
@@ -688,34 +662,31 @@ void LockCommand::run() {
     json_object * packages = json_object_new_array();
     for (const auto & name : install_order) {
         const auto & pkg = *pkg_by_name.at(name);
-        std::string hex;
-        auto integrity = integrity_of(pkg, hex);
         json_object * obj = package_object(pkg);
         add_string(obj, "url", package_url(pkg));
-        add_string(obj, "integrity", integrity);
-        if (!hex.empty()) {
-            add_string(obj, "checksum", hex);
+        add_string(obj, "integrity", integrity_of(pkg));
+        if (directly_requested.count(name)) {
+            json_object_object_add(obj, "requested", json_object_new_boolean(1));
         }
-        json_object_object_add(obj, "requested", json_object_new_boolean(directly_requested.count(name)));
 
-        json_object_object_add(obj, "dependencies", json_strings(kept_deps[name]));
-        json_object_object_add(obj, "dependencies_nevra", json_strings(direct[name].nevras));
-        // So that a later lock on top of this one knows what the package left unmet.
-        add_dep_strings(obj, "recommends", pkg.get_recommends());
-        add_dep_strings(obj, "supplements", pkg.get_supplements());
+        if (debug) {
+            json_object_object_add(obj, "dependencies", json_strings(kept_deps[name]));
+            add_dep_strings(obj, "recommends", pkg.get_recommends());
+            add_dep_strings(obj, "supplements", pkg.get_supplements());
 
-        NameSet transitive;
-        std::deque<std::string> walk{name};
-        while (!walk.empty()) {
-            auto current = walk.front();
-            walk.pop_front();
-            for (const auto & dep : direct[current].names) {
-                if (dep != name && kept(dep) && transitive.insert(dep).second) {
-                    walk.push_back(dep);
+            NameSet transitive;
+            std::deque<std::string> walk{name};
+            while (!walk.empty()) {
+                auto current = walk.front();
+                walk.pop_front();
+                for (const auto & dep : direct[current]) {
+                    if (dep != name && kept(dep) && transitive.insert(dep).second) {
+                        walk.push_back(dep);
+                    }
                 }
             }
+            json_object_object_add(obj, "transitive_dependencies", json_strings(transitive));
         }
-        json_object_object_add(obj, "transitive_dependencies", json_strings(transitive));
         json_object_array_add(packages, obj);
     }
     json_object_object_add(root, "packages", packages);

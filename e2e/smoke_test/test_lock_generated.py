@@ -29,7 +29,6 @@ def validate_lock_file(path: str) -> None:
         arch = pkg.get("arch")
         url = pkg.get("url")
         integrity = pkg.get("integrity")
-        checksum = pkg.get("checksum")
 
         if not name or not isinstance(name, str):
             raise ValueError(f"{path}: invalid or missing 'name': {pkg}")
@@ -42,12 +41,10 @@ def validate_lock_file(path: str) -> None:
             raise ValueError(f"{path}: invalid or missing 'url': {pkg}")
         if not integrity or not isinstance(integrity, str):
             raise ValueError(f"{path}: invalid or missing 'integrity': {pkg}")
-        if not (integrity.startswith("sha256-") or len(integrity) == 64):
-            raise ValueError(f"{path}: integrity is neither SRI sha256- nor 64-char hex: {integrity}")
-        if not checksum or not isinstance(checksum, str) or len(checksum) != 64:
-            raise ValueError(f"{path}: invalid or missing 64-char sha256 checksum: {pkg}")
+        if not integrity.startswith("sha256-"):
+            raise ValueError(f"{path}: integrity is not SRI sha256-: {integrity}")
 
-        print(f"  OK: {name}-{version}.{arch} -> {url} (integrity: {integrity}, sha256: {checksum[:8]}...)")
+        print(f"  OK: {name}-{version}.{arch} -> {url} (integrity: {integrity})")
 
     for order_name in install_order:
         if order_name not in pkg_names:
