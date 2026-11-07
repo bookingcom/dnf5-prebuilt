@@ -42,7 +42,7 @@ pull(
     platforms = ["linux/amd64"],
     registry = "index.docker.io",
     repository = "library/oraclelinux",
-    tag = "9-slim",
+    tag = "10-slim",
     unsafe_allow_tag_without_digest = True,
 )
 
