@@ -9,7 +9,7 @@ local_path_override(
 )
 
 bazel_dep(name = "bazel_lib", version = "3.7.2")
-bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "aspect_rules_py", version = "2.0.0-alpha.10")
 bazel_dep(name = "rules_containers_util", version = "0.0.2")
@@ -20,7 +20,7 @@ archive_override(
     urls = ["https://github.com/bookingcom/rules_containers_util/releases/download/v0.0.2/rules_containers_util-v0.0.2.tar.gz"],
 )
 
-bazel_dep(name = "rules_img", version = "0.3.24-20261029-189a6a2")
+bazel_dep(name = "rules_img", version = "0.3.24-20261101-d0a468b")
 bazel_dep(name = "tar.bzl", version = "0.10.9")
 
 dnf5 = use_extension("@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl", "dnf5")
