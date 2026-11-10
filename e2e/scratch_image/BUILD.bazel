@@ -40,7 +40,7 @@ dnf_config(
     },
 )
 
-# rpm_lock resolving curl from scratch
+# rpm_lock resolving curl and bash from scratch
 rpm_lock(
     name = "ol10_scratch_curl_amd64_lock",
     arch = [
@@ -48,7 +48,10 @@ rpm_lock(
         "noarch",
     ],
     config = ":ol10_amd64_dnf_config",
-    packages = ["curl"],
+    packages = [
+        "bash",
+        "curl",
+    ],
 )
 
 rpm_lock(
@@ -58,7 +61,10 @@ rpm_lock(
         "noarch",
     ],
     config = ":ol10_arm64_dnf_config",
-    packages = ["curl"],
+    packages = [
+        "bash",
+        "curl",
+    ],
 )
 
 # Test that generated lock files contain valid package entries, URLs, and sha256 checksums.
