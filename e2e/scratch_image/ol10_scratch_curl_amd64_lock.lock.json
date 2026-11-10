@@ -2,6 +2,7 @@
   "version":1,
   "arch":"x86_64,noarch",
   "requested":[
+    "bash",
     "curl"
   ],
   "install_order":[
@@ -325,7 +326,8 @@
       "version":"5.2.26-6.el10",
       "arch":"x86_64",
       "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/x86_64\/getPackage\/bash-5.2.26-6.el10.x86_64.rpm",
-      "integrity":"sha256-RYhu1E9CU\/r+xaCPlFeZQ52P9ywIgs+yniNT9MDhDD4="
+      "integrity":"sha256-RYhu1E9CU\/r+xaCPlFeZQ52P9ywIgs+yniNT9MDhDD4=",
+      "requested":true
     },
     {
       "name":"oraclelinux-release",
@@ -539,17 +541,17 @@
     },
     {
       "name":"libcurl",
-      "version":"8.12.1-4.el10_2.7",
+      "version":"8.12.1-4.el10_2.8",
       "arch":"x86_64",
-      "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/x86_64\/getPackage\/libcurl-8.12.1-4.el10_2.7.x86_64.rpm",
-      "integrity":"sha256-qi5RnfY3GaSdwa\/Iax\/buqQ77H2iHCBpEA28aBQpK\/Q="
+      "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/x86_64\/getPackage\/libcurl-8.12.1-4.el10_2.8.x86_64.rpm",
+      "integrity":"sha256-b2wSrJKE0dR+q1aVaxfcVBwcQlF8t6zp5UseV7vA\/kc="
     },
     {
       "name":"curl",
-      "version":"8.12.1-4.el10_2.7",
+      "version":"8.12.1-4.el10_2.8",
       "arch":"x86_64",
-      "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/x86_64\/getPackage\/curl-8.12.1-4.el10_2.7.x86_64.rpm",
-      "integrity":"sha256-u1dQyIIF\/W722XdebDs0fVyPZErKJ8+kaN\/ZEwFox58=",
+      "url":"https:\/\/yum.oracle.com\/repo\/OracleLinux\/OL10\/baseos\/latest\/x86_64\/getPackage\/curl-8.12.1-4.el10_2.8.x86_64.rpm",
+      "integrity":"sha256-ydLRn5aImsgnsiqYPX8idgMimbwGhikCPqIQD1Q0bqc=",
       "requested":true
     }
   ]
