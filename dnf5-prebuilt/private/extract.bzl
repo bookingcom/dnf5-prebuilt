@@ -164,7 +164,7 @@ def _rpm_extract_entry_impl(ctx):
     return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = [out]))]
 
 rpm_extract_entry = rule(
-    doc = "Exposes a single extracted file or directory from an extracted tree.",
+    doc = "Exposes a single extracted file or directory from an extracted tree. Extracted files that are symlinks in the RPM are dereferenced into standalone regular files.",
     implementation = _rpm_extract_entry_impl,
     attrs = {
         "is_dir": attr.bool(default = False, doc = "Whether the entry is a directory."),
@@ -195,7 +195,8 @@ def rpm_extract(
     """Extracts requested files and directories from RPM packages and makes them available as targets.
 
     The target names match the fully-qualified relative paths passed in `files` and `dirs`,
-    and are not shortened to basenames.
+    and are not shortened to basenames. If any extracted file is a symlink in the RPM,
+    it is automatically dereferenced into a standalone regular file.
 
     Args:
       name: Target name for the aggregate filegroup.

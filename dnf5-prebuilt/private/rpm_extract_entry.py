@@ -25,17 +25,27 @@ def main():
         parent = os.path.dirname(os.path.abspath(args.dst))
         if parent:
             os.makedirs(parent, exist_ok=True)
-        if os.path.islink(args.src):
-            target = os.readlink(args.src)
-            src_dir = os.path.dirname(args.src)
-            abs_target = os.path.normpath(os.path.join(src_dir, target))
-            if os.path.lexists(abs_target):
-                # Copy the actual target contents to avoid dangling symlinks
-                shutil.copy2(abs_target, args.dst)
-            else:
-                shutil.copy2(args.src, args.dst)
-        else:
-            shutil.copy2(args.src, args.dst)
+
+        # Dereference symlinks: follow the symlink chain to the real target file
+        real_src = os.path.realpath(args.src)
+        if not os.path.exists(real_src):
+            sys.stderr.write(
+                f"Error: file '{args.src}' is a symlink resolving to non-existent target '{real_src}'.\n"
+            )
+            sys.exit(1)
+        if os.path.isdir(real_src):
+            sys.stderr.write(f"Error: file '{args.src}' resolves to a directory '{real_src}'.\n")
+            sys.exit(1)
+
+        if os.path.lexists(args.dst):
+            os.remove(args.dst)
+
+        # Copy the dereferenced file content and mode
+        shutil.copy2(real_src, args.dst, follow_symlinks=True)
+
+        if os.path.islink(args.dst):
+            sys.stderr.write(f"Error: failed to dereference '{args.dst}', output is still a symlink.\n")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
