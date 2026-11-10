@@ -16,6 +16,7 @@ dnf_config(
         "x86_64",
         "noarch",
     ],
+    install_langs = "en_US.UTF-8",
     install_weak_deps = False,
     releasever = "10",
     repo_configs = [":oracle-linux-ol10.repo"],
@@ -31,6 +32,7 @@ dnf_config(
         "aarch64",
         "noarch",
     ],
+    install_langs = "en_US.UTF-8",
     install_weak_deps = False,
     releasever = "10",
     repo_configs = [":oracle-linux-ol10.repo"],
@@ -93,6 +95,7 @@ rpm_layer(
     name = "ol10_scratch_curl_amd64_layer_tar",
     gpgcheck = True,
     gpgkeys = ["@ol10_gpg_key//file"],
+    install_langs = "en_US.UTF-8",
     rpmdb = ":ol10_scratch_curl_amd64_rpmdb",
     rpms = ["@ol10_scratch_curl_amd64//:rpms"],
 )
@@ -106,6 +109,7 @@ rpm_layer(
     name = "ol10_scratch_curl_arm64_layer_tar",
     gpgcheck = True,
     gpgkeys = ["@ol10_gpg_key//file"],
+    install_langs = "en_US.UTF-8",
     rpmdb = ":ol10_scratch_curl_arm64_rpmdb",
     rpms = ["@ol10_scratch_curl_arm64//:rpms"],
 )
