@@ -51,11 +51,25 @@ load(
 ### `rpm_layer`
 
 ```starlark
-rpm_layer(name, rpms, rpmdb = None, compress = None, out = None, gpgcheck = False, gpgkeys = [], **kwargs)
+rpm_layer(
+    name,
+    rpms,
+    rpmdb = None,
+    compress = None,
+    out = None,
+    gpgcheck = False,
+    gpgkeys = [],
+    exclude_docs = True,
+    exclude_man = True,
+    exclude_licenses = True,
+    exclude_build_id = True,
+    exclude_patterns = [],
+    **kwargs,
+)
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
-1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation).
+1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation). By default, minimal container layers are produced by excluding documentation (`*/share/doc/*`, `*/share/info/*`), man pages (`*/share/man/*`), license files (`*/share/licenses/*`), and `.build-id` debug links.
 2. **Deduplication**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order.
 3. **RPM Database Injection** (optional): Injects an updated SQLite `rpmdb` under `/var/lib/rpm/rpmdb.sqlite`.
 4. **Compression** (optional): Compresses the layer archive using `gzip` or `zstd`.
@@ -71,6 +85,11 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 | `out` | `string` | `None` | Optional explicit output filename. Defaults to `<name>.tar` or `<name>.tar.{gz,zst}`. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures when `gpgcheck = True`. |
+| `exclude_docs` | `bool` | `True` | Exclude documentation and info files (`*/share/doc/*`, `*/share/info/*`). |
+| `exclude_man` | `bool` | `True` | Exclude manual pages (`*/share/man/*`). |
+| `exclude_licenses` | `bool` | `True` | Exclude license files (`*/share/licenses/*`). Set to `False` to preserve compliance notices in the layer. |
+| `exclude_build_id` | `bool` | `True` | Exclude `.build-id` debug symbol links (`*/.build-id/*`). |
+| `exclude_patterns` | `list of strings` | `[]` | Additional glob patterns to exclude during `bsdtar` extraction. |
 | `**kwargs` | `dict` | | Common rule attributes forwarded to the final rule (e.g. `visibility`, `tags`). |
 
 #### Example
@@ -92,7 +111,7 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, exclude_patterns = [], out = None)
 ```
 
 Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
@@ -106,6 +125,7 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to merging. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
+| `exclude_patterns` | `list of strings` | `[]` | Glob patterns to exclude when extracting RPMs with `bsdtar`. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 
 ---

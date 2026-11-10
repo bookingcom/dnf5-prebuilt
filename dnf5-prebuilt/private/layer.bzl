@@ -6,6 +6,28 @@ load("//dnf5-prebuilt/private:gpg.bzl", "gpg_attrs", "verify_rpms_gpg")
 
 TAR_TOOLCHAIN_TYPE = "@tar.bzl//tar/toolchain:type"
 
+DOCS_PATTERNS = [
+    "*/share/doc/*",
+    "*/share/doc",
+    "*/share/info/*",
+    "*/share/info",
+]
+
+MAN_PATTERNS = [
+    "*/share/man/*",
+    "*/share/man",
+]
+
+LICENSES_PATTERNS = [
+    "*/share/licenses/*",
+    "*/share/licenses",
+]
+
+BUILD_ID_PATTERNS = [
+    "*/.build-id/*",
+    "*/.build-id",
+]
+
 def _rpm_merge_impl(ctx):
     out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ".tar"))
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
@@ -19,6 +41,8 @@ def _rpm_merge_impl(ctx):
     args.add("--numeric-owner")
     args.add("--owner=0")
     args.add("--group=0")
+    for pattern in ctx.attr.exclude_patterns:
+        args.add("--exclude=" + pattern)
     for rpm in ctx.files.rpms:
         args.add("@" + rpm.path)
 
@@ -37,6 +61,10 @@ rpm_merge = rule(
     doc = "Merges RPM packages into an uncompressed tar archive using bsdtar.",
     implementation = _rpm_merge_impl,
     attrs = gpg_attrs() | {
+        "exclude_patterns": attr.string_list(
+            default = [],
+            doc = "Glob patterns to exclude when extracting RPMs with bsdtar.",
+        ),
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
         "rpms": attr.label_list(
             allow_files = [".rpm"],
@@ -175,11 +203,17 @@ def rpm_layer(
         out = None,
         gpgcheck = False,
         gpgkeys = [],
+        exclude_docs = True,
+        exclude_man = True,
+        exclude_licenses = True,
+        exclude_build_id = True,
+        exclude_patterns = [],
         **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
 
     Implements a multi-pass approach:
-    1. Merge all RPMs with bsdtar into an uncompressed archive (validating GPG signatures if gpgcheck is enabled).
+    1. Merge all RPMs with bsdtar into an uncompressed archive (validating GPG signatures if gpgcheck is enabled),
+       excluding docs, man pages, license files, and build-id by default for minimal container layers.
     2. Iterate over the entries and deduplicate directory and file paths with Python.
     3. Inject rpmdb into the archive (if rpmdb is specified).
     4. Compress the layer (if compress='gzip' or 'zstd' is specified).
@@ -192,11 +226,26 @@ def rpm_layer(
       out: Optional explicit output file name.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
       gpgkeys: Optional list of GPG public key files.
+      exclude_docs: Optional boolean flag (default True) to exclude documentation and info pages.
+      exclude_man: Optional boolean flag (default True) to exclude man pages.
+      exclude_licenses: Optional boolean flag (default True) to exclude license files.
+      exclude_build_id: Optional boolean flag (default True) to exclude .build-id debug links.
+      exclude_patterns: Optional list of additional glob patterns to exclude from the layer.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
     common_kwargs = propagate_common_rule_attributes(kwargs)
     intermediate_kwargs = dict(common_kwargs)
     intermediate_kwargs["visibility"] = ["//visibility:private"]
+
+    patterns = list(exclude_patterns)
+    if exclude_docs:
+        patterns.extend(DOCS_PATTERNS)
+    if exclude_man:
+        patterns.extend(MAN_PATTERNS)
+    if exclude_licenses:
+        patterns.extend(LICENSES_PATTERNS)
+    if exclude_build_id:
+        patterns.extend(BUILD_ID_PATTERNS)
 
     raw_target = name + "_raw"
     rpm_merge(
@@ -205,6 +254,7 @@ def rpm_layer(
         rpmdb = rpmdb,
         gpgcheck = gpgcheck,
         gpgkeys = gpgkeys,
+        exclude_patterns = patterns,
         out = name + "_raw.tar",
         **intermediate_kwargs
     )
