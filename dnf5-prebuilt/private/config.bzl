@@ -55,6 +55,10 @@ SOLVER_ATTRS = {
         doc = "Architecture to solve for instead of the host's (--forcearch). Default: the first entry of arch that " +
               "is not noarch.",
     ),
+    "install_langs": attr.string(
+        default = "",
+        doc = "Language locales to install/keep (install_langs= in dnf.conf and --setopt=install_langs=... in preamble).",
+    ),
     "install_weak_deps": attr.bool(
         default = True,
         doc = "Install weak dependencies, Recommends and matching Supplements (install_weak_deps=). False leaves " +
@@ -101,6 +105,7 @@ def render_dnf_config(
         forcearch = "",
         nobest = False,
         install_weak_deps = True,
+        install_langs = "",
         excludepkgs = [],
         module_platform_id = "",
         module_enable = [],
@@ -118,6 +123,7 @@ def render_dnf_config(
       forcearch: architecture to solve for, overriding the one derived from arch.
       nobest: allow older candidates (best=False).
       install_weak_deps: install weak dependencies.
+      install_langs: language locales to install/keep (install_langs= in dnf.conf).
       excludepkgs: NEVRA globs hidden from the solver.
       module_platform_id: platform module that module streams are resolved against.
       module_enable: module streams (NAME:STREAM) to enable.
@@ -136,6 +142,8 @@ def render_dnf_config(
         # The default appends the host's /etc/os-release name and arch.
         "user_agent": "libdnf",
     }
+    if install_langs:
+        main["install_langs"] = install_langs
     if excludepkgs:
         main["excludepkgs"] = ",".join(excludepkgs)
     if module_platform_id:

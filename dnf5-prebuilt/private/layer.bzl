@@ -80,6 +80,8 @@ def _tar_dedup_impl(ctx):
     args = ctx.actions.args()
     args.add("--input", ctx.file.src)
     args.add("--output", out)
+    if ctx.attr.install_langs:
+        args.add("--install-langs", ctx.attr.install_langs)
 
     ctx.actions.run(
         mnemonic = "TarDedup",
@@ -92,9 +94,13 @@ def _tar_dedup_impl(ctx):
     return [DefaultInfo(files = depset([out]))]
 
 tar_dedup = rule(
-    doc = "Deduplicates tar directory entries and files, keeping the last occurrence.",
+    doc = "Deduplicates tar directory entries and files, keeping the last occurrence and filtering locales.",
     implementation = _tar_dedup_impl,
     attrs = {
+        "install_langs": attr.string(
+            default = "",
+            doc = "Language locales to keep (e.g. 'en_US.UTF-8'), filtering non-matching locale files.",
+        ),
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
         "src": attr.label(
             allow_single_file = True,
@@ -208,13 +214,15 @@ def rpm_layer(
         exclude_licenses = True,
         exclude_build_id = True,
         exclude_patterns = [],
+        install_langs = None,
         **kwargs):
     """Assembles RPM packages into an OCI container layer tarball.
 
     Implements a multi-pass approach:
     1. Merge all RPMs with bsdtar into an uncompressed archive (validating GPG signatures if gpgcheck is enabled),
        excluding docs, man pages, license files, and build-id by default for minimal container layers.
-    2. Iterate over the entries and deduplicate directory and file paths with Python.
+    2. Iterate over the entries and deduplicate directory and file paths with Python, optionally filtering
+       locales if install_langs is specified (mimicking DNF --setopt=install_langs=... and RPM %_install_langs).
     3. Inject rpmdb into the archive (if rpmdb is specified).
     4. Compress the layer (if compress='gzip' or 'zstd' is specified).
 
@@ -231,6 +239,8 @@ def rpm_layer(
       exclude_licenses: Optional boolean flag (default True) to exclude license files.
       exclude_build_id: Optional boolean flag (default True) to exclude .build-id debug links.
       exclude_patterns: Optional list of additional glob patterns to exclude from the layer.
+      install_langs: Optional language locales to keep (e.g. 'en_US.UTF-8' or ['en_US.UTF-8']),
+        filtering non-matching locale files and translation catalogs in /usr/share/locale and /usr/lib/locale.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
     common_kwargs = propagate_common_rule_attributes(kwargs)
@@ -246,6 +256,13 @@ def rpm_layer(
         patterns.extend(LICENSES_PATTERNS)
     if exclude_build_id:
         patterns.extend(BUILD_ID_PATTERNS)
+
+    install_langs_str = ""
+    if install_langs:
+        if type(install_langs) == "list":
+            install_langs_str = ":".join(install_langs)
+        else:
+            install_langs_str = str(install_langs)
 
     raw_target = name + "_raw"
     rpm_merge(
@@ -263,6 +280,7 @@ def rpm_layer(
         tar_dedup(
             name = name,
             src = ":" + raw_target,
+            install_langs = install_langs_str,
             out = out or (name if name.endswith(".tar") else (name + ".tar")),
             **kwargs
         )
@@ -272,6 +290,7 @@ def rpm_layer(
     tar_dedup(
         name = dedup_target,
         src = ":" + raw_target,
+        install_langs = install_langs_str,
         out = name + "_dedup.tar",
         **intermediate_kwargs
     )

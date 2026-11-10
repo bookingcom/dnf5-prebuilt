@@ -64,13 +64,14 @@ rpm_layer(
     exclude_licenses = True,
     exclude_build_id = True,
     exclude_patterns = [],
+    install_langs = None,
     **kwargs,
 )
 ```
 
 Macro that assembles RPM packages into an OCI container layer tarball using a deterministic, multi-pass pipeline:
 1. **Streaming Extraction and Merging**: Merges all RPMs into an uncompressed tar archive using `bsdtar` in memory without unpacking files to disk (with optional per-RPM GPG signature validation). By default, minimal container layers are produced by excluding documentation (`*/share/doc/*`, `*/share/info/*`), man pages (`*/share/man/*`), license files (`*/share/licenses/*`), and `.build-id` debug links.
-2. **Deduplication**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order.
+2. **Deduplication and Locale Filtering**: Deduplicates file and directory paths in the tar archive, keeping the last occurrence to match installation order. When `install_langs` is specified (e.g. `'en_US.UTF-8'`), filters out non-matching translation files in `/usr/share/locale` and `/usr/lib/locale` (mimicking DNF `--setopt=install_langs=...` and RPM `%_install_langs`), saving substantial disk space in minimal container layers.
 3. **RPM Database Injection** (optional): Injects an updated SQLite `rpmdb` under `/var/lib/rpm/rpmdb.sqlite`.
 4. **Compression** (optional): Compresses the layer archive using `gzip` or `zstd`.
 
@@ -90,6 +91,7 @@ Macro that assembles RPM packages into an OCI container layer tarball using a de
 | `exclude_licenses` | `bool` | `True` | Exclude license files (`*/share/licenses/*`). Set to `False` to preserve compliance notices in the layer. |
 | `exclude_build_id` | `bool` | `True` | Exclude `.build-id` debug symbol links (`*/.build-id/*`). |
 | `exclude_patterns` | `list of strings` | `[]` | Additional glob patterns to exclude during `bsdtar` extraction. |
+| `install_langs` | `string or list of strings` | `None` | Language locales to keep (e.g. `'en_US.UTF-8'` or `['en_US.UTF-8']`), mimicking DNF `--setopt=install_langs=...` and RPM `%_install_langs`. Filters non-matching locale files in `/usr/share/locale` and `/usr/lib/locale`. |
 | `**kwargs` | `dict` | | Common rule attributes forwarded to the final rule (e.g. `visibility`, `tags`). |
 
 #### Example
@@ -201,10 +203,10 @@ sh_binary(
 ### `tar_dedup`
 
 ```starlark
-tar_dedup(name, src, out = None)
+tar_dedup(name, src, install_langs = "", out = None)
 ```
 
-Rule that deduplicates directory entries and files in an uncompressed tar archive, preserving the last occurrence of each file to match package installation ordering.
+Rule that deduplicates directory entries and files in an uncompressed tar archive, preserving the last occurrence of each file to match package installation ordering. When `install_langs` is specified, filters out non-matching locale translation files.
 
 #### Attributes
 
@@ -212,6 +214,7 @@ Rule that deduplicates directory entries and files in an uncompressed tar archiv
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
 | `src` | `label` | *mandatory* | Input uncompressed tar archive. |
+| `install_langs` | `string` | `""` | Optional language locales to keep (e.g. `'en_US.UTF-8'`), filtering out non-matching locale files. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 
 ---
@@ -368,6 +371,7 @@ dnf_config(
     forcearch = "",
     nobest = False,
     install_weak_deps = True,
+    install_langs = "",
     module_enable = [],
     module_platform_id = "",
     excludepkgs = [],
@@ -390,6 +394,7 @@ Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`
 | `forcearch` | `string` | `""` | Forced solver architecture. Defaults to first non-noarch entry in `arch`. |
 | `nobest` | `bool` | `False` | Allow older candidates when newest requested package cannot be installed. |
 | `install_weak_deps` | `bool` | `True` | Install weak/recommended dependencies. |
+| `install_langs` | `string` | `""` | Language locales to install/keep (`install_langs=` in `dnf.conf` and `--setopt=install_langs=...` in preamble). |
 | `module_enable` | `list of strings` | `[]` | Module streams (`NAME:STREAM`) to enable before resolving. |
 | `module_platform_id` | `string` | `""` | Platform module stream ID (e.g. `'platform:el9'`). |
 | `excludepkgs` | `list of strings` | `[]` | Package NEVRA globs hidden from solver (`excludepkgs=`). |

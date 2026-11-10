@@ -282,3 +282,17 @@ sh_test(
         ":test_rpm_extract_unit_bin",
     ],
 )
+
+py_binary(
+    name = "test_tar_dedup_unit_bin",
+    srcs = ["test_tar_dedup_unit.py"],
+    data = ["@dnf5-prebuilt//dnf5-prebuilt/private:all_files"],
+    main = "test_tar_dedup_unit.py",
+)
+
+sh_test(
+    name = "tar_dedup_unit_test",
+    srcs = ["run_tar_dedup_test.sh"],
+    args = ["$(rootpath :test_tar_dedup_unit_bin)"],
+    data = [":test_tar_dedup_unit_bin"],
+)
