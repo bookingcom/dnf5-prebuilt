@@ -43,8 +43,9 @@ def _rpm_lock_impl(ctx):
         module_enable = ctx.attr.module_enable or info.module_enable
     else:
         repo_configs = list(ctx.files.repo_configs)
-        if not repo_configs:
-            fail("When 'config' is not specified, 'repo_configs' must be provided.")
+        repo_dirs = list(ctx.files.repo_dirs)
+        if not repo_configs and not repo_dirs:
+            fail("When 'config' is not specified, at least one of 'repo_configs' or 'repo_dirs' must be provided.")
         releasever = ctx.attr.releasever or "9"
         settings = solver_settings(ctx.attr)
         settings["releasever"] = releasever
@@ -54,6 +55,7 @@ def _rpm_lock_impl(ctx):
             repo_configs,
             ctx.files.repo_files,
             ctx.attr.arch,
+            repo_dirs = repo_dirs,
             **settings
         )
         arch = ctx.attr.arch
@@ -184,8 +186,12 @@ _RPM_LOCK_ATTRS.update({
         doc = "Distribution release version (--releasever), e.g. '9'.",
     ),
     "repo_configs": attr.label_list(
+        allow_files = [".repo", ".conf"],
+        doc = "The .repo files defining repository configurations.",
+    ),
+    "repo_dirs": attr.label_list(
         allow_files = True,
-        doc = "The .repo files or directory artifacts defining repository configurations.",
+        doc = "Directory artifacts containing .repo files.",
     ),
     "repo_files": attr.label_list(
         allow_files = True,

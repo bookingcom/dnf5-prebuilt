@@ -104,7 +104,8 @@ def render_dnf_config(
         excludepkgs = [],
         module_platform_id = "",
         module_enable = [],
-        vars = {}):
+        vars = {},
+        repo_dirs = []):
     """Renders dnf.conf, the repos.d files and preamble.args under <prefix>/.
 
     Args:
@@ -121,6 +122,7 @@ def render_dnf_config(
       module_platform_id: platform module that module streams are resolved against.
       module_enable: module streams (NAME:STREAM) to enable.
       vars: custom variables to pass via --setvar.
+      repo_dirs: directory artifacts containing .repo files.
 
     Returns:
       A DnfConfigInfo.
@@ -146,17 +148,16 @@ def render_dnf_config(
     rd_args = ctx.actions.args()
     rd_args.add("--output", repos_d.path)
     for template in repo_configs:
-        if template.is_directory:
-            rd_args.add("--dir", template.path)
-        else:
-            rd_args.add("--file", template.path)
+        rd_args.add("--file", template.path)
+    for rdir in repo_dirs:
+        rd_args.add("--dir", rdir.path)
 
     ctx.actions.run(
         mnemonic = "RenderReposD",
         progress_message = "Rendering repos.d for %s" % ctx.label.name,
         executable = ctx.executable._render_repos_d_tool,
         arguments = [rd_args],
-        inputs = repo_configs,
+        inputs = repo_configs + repo_dirs,
         outputs = [repos_d],
     )
 
@@ -211,12 +212,15 @@ done < "%s"
 """ % (path_of(info.conf).rsplit("/", 1)[0], _repo_dir(info.repo_files, path_of), path_of(info.args_file), path_of(dnf5), command)
 
 def _dnf_config_impl(ctx):
+    if not ctx.files.repo_configs and not ctx.files.repo_dirs:
+        fail("At least one of 'repo_configs' or 'repo_dirs' must be specified in %s" % ctx.label)
     info = render_dnf_config(
         ctx,
         ctx.label.name,
         ctx.files.repo_configs,
         ctx.files.repo_files,
         ctx.attr.arch,
+        repo_dirs = ctx.files.repo_dirs,
         **solver_settings(ctx.attr)
     )
     return [
@@ -238,10 +242,15 @@ The provider carries the files and DNF5_PREAMBLE, the fixed command line that ma
             doc = "Target CPU architectures, as for rpm_lock.",
         ),
         "repo_configs": attr.label_list(
-            mandatory = True,
-            allow_empty = False,
+            default = [],
+            allow_files = [".repo", ".conf"],
+            doc = "Repository definitions, one file per repository, as rpm_lock's repo_configs. " +
+                  "A placeholder @REPO_DIR@ stands for the directory of repo_files.",
+        ),
+        "repo_dirs": attr.label_list(
+            default = [],
             allow_files = True,
-            doc = "Repository definitions, as individual .repo files or directory artifacts containing .repo files. " +
+            doc = "Repository definition directory artifacts containing .repo files. " +
                   "A placeholder @REPO_DIR@ stands for the directory of repo_files.",
         ),
         "repo_files": attr.label_list(
