@@ -113,7 +113,7 @@ rbe_container_image(
 bazel_dep(name = "toml11", version = "4.4.0", dev_dependency = True)
 bazel_dep(name = "curl", version = "8.22.0.bcr.3", dev_dependency = True)
 bazel_dep(name = "fmt", version = "12.2.0.bcr.1", dev_dependency = True)
-bazel_dep(name = "glib", version = "2.84.4", dev_dependency = True)
+bazel_dep(name = "glib", version = "2.84.4.bcr.1", dev_dependency = True)
 bazel_dep(name = "libxml2", version = "2.15.4", dev_dependency = True)
 bazel_dep(name = "openssl", version = "4.0.3.bcr.1", dev_dependency = True)
 bazel_dep(name = "sqlite3", version = "3.53.4", dev_dependency = True)
