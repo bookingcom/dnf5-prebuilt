@@ -11,6 +11,7 @@ load(
     "current_dnf5_toolchain",
     "dnf5_toolchain",
     "dnf_config",
+    "rpm_extract",
     "rpm_layer",
     "rpm_lock",
     "rpm_mark",
@@ -28,6 +29,7 @@ load(
 - [Container Layer Assembly](#container-layer-assembly)
   - [`rpm_layer`](#rpm_layer)
   - [`rpm_merge`](#rpm_merge)
+  - [`rpm_extract`](#rpm_extract)
   - [`tar_dedup`](#tar_dedup)
   - [`rpmdb_inject`](#rpmdb_inject)
   - [`tar_compress`](#tar_compress)
@@ -105,6 +107,71 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
+
+---
+
+### `rpm_extract`
+
+```starlark
+rpm_extract(name, rpms, files = [], dirs = [], directories = [], gpgcheck = False, gpgkeys = [], rpmdb = None, **kwargs)
+```
+
+Macro that extracts specific files and directories from RPM packages and makes them available as individual targets in Bazel. Target names match the fully-qualified relative paths passed in `files` and `dirs`, rather than being shortened to their basename (e.g. `usr/bin/curl` instead of `curl`).
+
+#### Parameters
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name` | `string` | *mandatory* | Aggregate target name (exposes a `filegroup` containing all extracted targets). |
+| `rpms` | `list of labels` | *mandatory* | List of RPM package files (`.rpm`) to extract from. |
+| `files` | `list of strings` | `[]` | List of file paths to extract from the RPMs (e.g. `["usr/bin/curl", "usr/lib64/libcurl.so.4"]`). |
+| `dirs` | `list of strings` | `[]` | List of directory paths to extract from the RPMs (e.g. `["etc/pki/tls", "usr/share/curl"]`). |
+| `directories` | `list of strings` | `[]` | Alias for `dirs`. |
+| `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to extraction. Automatically enabled if `gpgkeys` is provided. |
+| `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
+| `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
+| `**kwargs` | `dict` | | Common rule attributes forwarded to generated targets (e.g. `visibility`, `tags`). |
+
+#### Target Names and Visibility
+
+Every path specified in `files` and `dirs` becomes a first-class Bazel target in the package where `rpm_extract` is called:
+- File paths (e.g. `"usr/bin/curl"` or `"/usr/bin/curl"`) produce file targets named `:usr/bin/curl` (`//package:usr/bin/curl`).
+- Directory paths (e.g. `"etc/pki/tls"` or `"/etc/pki/tls/"`) produce directory TreeArtifact targets named `:etc/pki/tls` (`//package:etc/pki/tls`).
+- The aggregate target `:<name>` (`//package:<name>`) builds and provides all extracted files and directories.
+
+#### Example
+
+```starlark
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_extract")
+
+rpm_extract(
+    name = "curl_extracted",
+    rpms = [
+        "@ol9_curl_rpm//file",
+        "@ol9_libcurl_rpm//file",
+    ],
+    gpgcheck = True,
+    rpmdb = ":ol9_curl_rpmdb",
+    files = [
+        "usr/bin/curl",
+        "/usr/lib64/libcurl.so.4",
+    ],
+    dirs = [
+        "usr/share/licenses/libcurl",
+    ],
+)
+
+# Reference individual targets by their fully-qualified path:
+sh_binary(
+    name = "my_tool",
+    srcs = ["run.sh"],
+    data = [
+        ":usr/bin/curl",
+        ":usr/lib64/libcurl.so.4",
+        ":usr/share/licenses/libcurl",
+    ],
+)
+```
 
 ---
 

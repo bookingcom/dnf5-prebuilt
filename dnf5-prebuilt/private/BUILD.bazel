@@ -37,3 +37,13 @@ py_binary(
     name = "rpm_mark",
     srcs = ["rpm_mark.py"],
 )
+
+py_binary(
+    name = "rpm_extract",
+    srcs = ["rpm_extract.py"],
+)
+
+py_binary(
+    name = "rpm_extract_entry",
+    srcs = ["rpm_extract_entry.py"],
+)

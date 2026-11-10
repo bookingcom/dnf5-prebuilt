@@ -11,6 +11,10 @@ load(
     _dnf_config = "dnf_config",
 )
 load(
+    "//dnf5-prebuilt/private:extract.bzl",
+    _rpm_extract = "rpm_extract",
+)
+load(
     "//dnf5-prebuilt/private:layer.bzl",
     _rpm_layer = "rpm_layer",
     _rpm_merge = "rpm_merge",
@@ -36,5 +40,6 @@ rpm_merge = _rpm_merge
 rpmdb_inject = _rpmdb_inject
 tar_compress = _tar_compress
 tar_dedup = _tar_dedup
+rpm_extract = _rpm_extract
 rpm_lock = _rpm_lock
 rpm_mark = _rpm_mark
