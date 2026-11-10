@@ -1,4 +1,4 @@
-load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_layer", "rpm_lock", "rpm_mark")
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_extract", "rpm_layer", "rpm_lock", "rpm_mark")
 load("@rules_img//img:image.bzl", "image_manifest")
 load("@rules_img//img:layer.bzl", "layer_from_tar")
 load("@rules_img//img:load.bzl", "image_load")
@@ -210,5 +210,35 @@ sh_test(
     tags = [
         "local",
         "manual",
+    ],
+)
+
+rpm_extract(
+    name = "ol9_curl_extracted",
+    dirs = [
+        "usr/share/licenses/libcurl",
+    ],
+    files = [
+        "/usr/lib64/libcurl.so.4",
+        "usr/bin/curl",
+    ],
+    gpgcheck = True,
+    rpmdb = ":ol9_curl_rpmdb",
+    rpms = OL9_CURL_RPMS,
+)
+
+sh_test(
+    name = "rpm_extract_test",
+    srcs = ["test_rpm_extract.sh"],
+    args = [
+        "$(rootpath :usr/bin/curl)",
+        "$(rootpath :usr/lib64/libcurl.so.4)",
+        "$(rootpath :usr/share/licenses/libcurl)",
+    ],
+    data = [
+        ":ol9_curl_extracted",
+        ":usr/bin/curl",
+        ":usr/lib64/libcurl.so.4",
+        ":usr/share/licenses/libcurl",
     ],
 )
