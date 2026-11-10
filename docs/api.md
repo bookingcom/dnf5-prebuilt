@@ -283,7 +283,8 @@ Running `bazel run <target>` updates the lockfile in place in the source tree us
 | `excludepkgs` | `list of strings` | `[]` | Package NEVRA globs hidden from solver (`excludepkgs=`). |
 | `exclude` | `list of strings` | `[]` | Package names or NEVRA globs to exclude and prune from the dependency tree. |
 | `vars` | `dict of strings` | `{}` | Custom variables passed via `--setvar=NAME=VALUE`. |
-| `repo_configs` | `list of labels` | `[]` | `.repo` configuration files. |
+| `repo_configs` | `list of labels` | `[]` | List of `.repo` configuration files. |
+| `repo_dirs` | `list of labels` | `[]` | List of directory artifacts containing `.repo` files. |
 | `repo_files` | `list of labels` | `[]` | Repository metadata files (repodata XMLs, signatures). |
 | `debug` | `bool` | `False` | Include debugging fields (`dependencies`, `transitive_dependencies`, `recommends`, `supplements`) in the lockfile. |
 | `out` | `output` | `None` | Explicit output file. Defaults to `<name>.lock.json`. |
@@ -341,7 +342,8 @@ dnf_config(
     name,
     arch,
     releasever,
-    repo_configs,
+    repo_configs = [],
+    repo_dirs = [],
     repo_files = [],
     forcearch = "",
     nobest = False,
@@ -353,7 +355,7 @@ dnf_config(
 )
 ```
 
-Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`, generating a `DnfConfigInfo` provider and preamble argument file pinning dnf5 to the hermetic sandbox.
+Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`, generating a `DnfConfigInfo` provider and preamble argument file pinning dnf5 to the hermetic sandbox. Repository configurations can be supplied as individual `.repo` files via `repo_configs`, as directory artifacts via `repo_dirs`, or both; they are merged together during rule execution into `repos.d/`. At least one of `repo_configs` or `repo_dirs` must be provided.
 
 #### Attributes
 
@@ -362,7 +364,8 @@ Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`
 | `name` | `string` | *mandatory* | Target name. |
 | `arch` | `list of strings` | *mandatory* | Target CPU architectures (e.g. `["x86_64", "noarch"]`). |
 | `releasever` | `string` | *mandatory* | Distribution release version passed to `--releasever` (e.g. `"9"`). |
-| `repo_configs` | `list of labels` | *mandatory* | Template `.repo` or `.conf` files, or directory artifacts containing `.repo` files (e.g. extracted via `rpm_extract` or container image extraction). `@REPO_DIR@` is expanded to the repository directory. |
+| `repo_configs` | `list of labels` | `[]` | Template `.repo` or `.conf` files. `@REPO_DIR@` is expanded to the repository directory. |
+| `repo_dirs` | `list of labels` | `[]` | Directory artifacts containing `.repo` files (e.g. extracted via `rpm_extract` or container image extraction). `@REPO_DIR@` is expanded to the repository directory. |
 | `repo_files` | `list of labels` | `[]` | Repository files (repodata XMLs, signatures). |
 | `forcearch` | `string` | `""` | Forced solver architecture. Defaults to first non-noarch entry in `arch`. |
 | `nobest` | `bool` | `False` | Allow older candidates when newest requested package cannot be installed. |

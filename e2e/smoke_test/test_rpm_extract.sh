@@ -5,6 +5,7 @@ CURL_BIN="$1"
 LIBCURL_SO="$2"
 LIBCURL_REAL_SO="$3"
 LICENSES_DIR="$4"
+UNIT_TEST_BIN="$5"
 
 echo "Checking curl binary: ${CURL_BIN}"
 if [[ ! -f "${CURL_BIN}" ]]; then
@@ -72,6 +73,6 @@ for f in "${LICENSES_DIR}"/*; do
 done
 
 echo "Running unit tests covering absolute links, climbing links, cross-RPM links, install order, and errors..."
-python3 "$(dirname "$0")/test_rpm_extract_unit.py"
+"${UNIT_TEST_BIN}"
 
 echo "All rpm_extract checks passed successfully!"
