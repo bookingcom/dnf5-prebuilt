@@ -142,20 +142,23 @@ def render_dnf_config(
     conf = ctx.actions.declare_file(prefix + "/dnf.conf")
     ctx.actions.write(conf, "[main]\n" + "".join(["%s=%s\n" % (k, main[k]) for k in sorted(main)]))
 
-    repos = []
-    seen = {}
+    repos_d = ctx.actions.declare_directory("%s/repos.d" % prefix)
+    rd_args = ctx.actions.args()
+    rd_args.add("--output", repos_d.path)
     for template in repo_configs:
-        stem = template.basename.rsplit(".", 1)[0]
-        if stem in seen:
-            fail("repo_configs: two files named %s.*" % stem)
-        seen[stem] = True
-        repo = ctx.actions.declare_file("%s/repos.d/%s.repo" % (prefix, stem))
-        ctx.actions.expand_template(
-            template = template,
-            output = repo,
-            substitutions = {"@REPO_DIR@": "${repo_dir}"},
-        )
-        repos.append(repo)
+        if template.is_directory:
+            rd_args.add("--dir", template.path)
+        else:
+            rd_args.add("--file", template.path)
+
+    ctx.actions.run(
+        mnemonic = "RenderReposD",
+        progress_message = "Rendering repos.d for %s" % ctx.label.name,
+        executable = ctx.executable._render_repos_d_tool,
+        arguments = [rd_args],
+        inputs = repo_configs,
+        outputs = [repos_d],
+    )
 
     if not forcearch:
         forcearch = ([a for a in arch if a != "noarch"] or [""])[0]
@@ -168,7 +171,7 @@ def render_dnf_config(
     args_file = ctx.actions.declare_file(prefix + "/preamble.args")
     ctx.actions.write(args_file, "".join([a + "\n" for a in preamble]))
 
-    data = [conf, args_file] + repos + repo_files
+    data = [conf, args_file, repos_d] + repo_files
     return DnfConfigInfo(
         arch = arch,
         args_file = args_file,
@@ -181,7 +184,7 @@ def render_dnf_config(
         repo_dir = _repo_dir(repo_files, lambda f: f.path),
         repo_dir_short = _repo_dir(repo_files, lambda f: f.short_path),
         repo_files = repo_files,
-        repos = repos,
+        repos = [repos_d],
         vars = vars,
     )
 
@@ -237,13 +240,18 @@ The provider carries the files and DNF5_PREAMBLE, the fixed command line that ma
         "repo_configs": attr.label_list(
             mandatory = True,
             allow_empty = False,
-            allow_files = [".repo", ".conf"],
-            doc = "Repository definitions, one file per repository, as rpm_lock's repo_config. " +
+            allow_files = True,
+            doc = "Repository definitions, as individual .repo files or directory artifacts containing .repo files. " +
                   "A placeholder @REPO_DIR@ stands for the directory of repo_files.",
         ),
         "repo_files": attr.label_list(
             allow_files = True,
             doc = "Local repository metadata and packages (repodata/...), as rpm_lock's repo_files.",
+        ),
+        "_render_repos_d_tool": attr.label(
+            default = Label("//dnf5-prebuilt/private:render_repos_d"),
+            executable = True,
+            cfg = "exec",
         ),
     },
 )

@@ -1,4 +1,5 @@
-load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_extract", "rpm_layer", "rpm_lock", "rpm_mark")
+load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_extract", "rpm_layer", "rpm_lock", "rpm_mark")
 load("@rules_img//img:image.bzl", "image_manifest")
 load("@rules_img//img:layer.bzl", "layer_from_tar")
 load("@rules_img//img:load.bzl", "image_load")
@@ -80,6 +81,30 @@ rpm_lock(
     packages = ["jq"],
 )
 
+# Test dnf_config with a directory artifact in repo_configs
+copy_to_directory(
+    name = "ol9_repos_dir",
+    srcs = [":ol9_oracle-linux-ol9_repo"],
+)
+
+dnf_config(
+    name = "ol9_dir_dnf_config",
+    install_weak_deps = False,
+    releasever = "9",
+    repo_configs = [":ol9_repos_dir"],
+    vars = {
+        "ocidomain": "oracle.com",
+        "ociregion": "",
+    },
+)
+
+rpm_lock(
+    name = "ol9_curl_dir_lock",
+    base_rpmdb = ":ol9_rpmdb",
+    config = ":ol9_dir_dnf_config",
+    packages = ["curl"],
+)
+
 # Test that generated lock files contain valid package entries, URLs, and sha256 checksums.
 sh_test(
     name = "test_generated_locks",
@@ -89,12 +114,14 @@ sh_test(
         "$(rootpath :ol10_curl_amd64_lock)",
         "$(rootpath :ol10_curl_arm64_lock)",
         "$(rootpath :centos9_lock)",
+        "$(rootpath :ol9_curl_dir_lock)",
     ],
     data = [
         "test_lock_generated.py",
         ":centos9_lock",
         ":ol10_curl_amd64_lock",
         ":ol10_curl_arm64_lock",
+        ":ol9_curl_dir_lock",
         ":ol9_curl_lock",
     ],
 )
@@ -221,6 +248,7 @@ rpm_extract(
     files = [
         "/usr/lib64/libcurl.so.4",
         "usr/bin/curl",
+        "usr/lib64/libcurl.so.4.7.0",
     ],
     gpgcheck = True,
     rpmdb = ":ol9_curl_rpmdb",
@@ -231,14 +259,18 @@ sh_test(
     name = "rpm_extract_test",
     srcs = ["test_rpm_extract.sh"],
     args = [
-        "$(rootpath :usr/bin/curl)",
-        "$(rootpath :usr/lib64/libcurl.so.4)",
-        "$(rootpath :usr/share/licenses/libcurl)",
+        "$(rootpath :ol9_curl_extracted/usr/bin/curl)",
+        "$(rootpath :ol9_curl_extracted/usr/lib64/libcurl.so.4)",
+        "$(rootpath :ol9_curl_extracted/usr/lib64/libcurl.so.4.7.0)",
+        "$(rootpath :ol9_curl_extracted/usr/share/licenses/libcurl)",
     ],
     data = [
+        "test_rpm_extract_unit.py",
         ":ol9_curl_extracted",
-        ":usr/bin/curl",
-        ":usr/lib64/libcurl.so.4",
-        ":usr/share/licenses/libcurl",
+        ":ol9_curl_extracted/usr/bin/curl",
+        ":ol9_curl_extracted/usr/lib64/libcurl.so.4",
+        ":ol9_curl_extracted/usr/lib64/libcurl.so.4.7.0",
+        ":ol9_curl_extracted/usr/share/licenses/libcurl",
+        "@dnf5-prebuilt//dnf5-prebuilt/private:all_files",
     ],
 )
