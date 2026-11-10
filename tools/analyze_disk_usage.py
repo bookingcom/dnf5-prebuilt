@@ -1,12 +1,56 @@
 #!/usr/bin/env python3
 """Analyzes disk usage of the layer tarball and generates a Markdown report."""
 
+import argparse
 import os
+import sys
 import tarfile
 from collections import defaultdict
 
 
-def generate_report(tar_path: str, output_path: str):
+def describe_directory(d: str) -> str:
+    """Returns a brief human-readable description for common directories."""
+    if "rpm" in d and "sysimage" in d:
+        return "Injected RPM SQLite database (rpmdb.sqlite)"
+    elif "ca-trust-source" in d or "pki/ca-trust" in d:
+        return "Root CA trust source bundle"
+    elif "sysimage" in d:
+        return "Injected RPM SQLite database directory"
+    elif "pki" in d:
+        return "CA certificates bundle (ca-bundle.trust.crt)"
+    elif "locale" in d:
+        return "Translation catalogs (.mo) and locale definitions"
+    elif "ossl-modules" in d:
+        return "OpenSSL FIPS and legacy providers"
+    elif "terminfo" in d:
+        return "Terminal capabilities database"
+    elif "pkcs11" in d:
+        return "PKCS#11 trust modules"
+    elif "gawk" in d:
+        return "Gawk extensions and shared plugins"
+    elif "gconv" in d:
+        return "GNU C Library iconv character set conversion modules"
+    elif "engines-3" in d:
+        return "OpenSSL cryptographic engine plugins"
+    elif "krb5" in d:
+        return "Kerberos plugin modules"
+    elif "publicsuffix" in d:
+        return "Public Suffix List database (libpsl)"
+    elif "crypto-policies" in d:
+        return "System-wide cryptographic policy configurations"
+    elif "systemd" in d:
+        return "Systemd library support files"
+    elif "awk" in d:
+        return "Awk standard library routines"
+    return ""
+
+
+def generate_report(
+    tar_path: str,
+    output_path: str,
+    max_depth: int = 4,
+    min_pct: float = 3.0,
+):
     all_files = []
     dir_sizes = defaultdict(int)
     dir_files = defaultdict(int)
@@ -43,57 +87,33 @@ def generate_report(tar_path: str, output_path: str):
         f"({total_uncompressed / (1024 * 1024):.2f} MiB / {total_uncompressed / 1000000:.2f} MB)"
     )
     md.append(f"- **Total Regular Files**: {len(all_files):,} files")
-    md.append("- **Docker Reported Image Size**: 80.8 MB")
+    md.append("- **Docker Reported Image Size**: 57.9 MB")
     md.append(
         "- **Excluded Extraneous Files**: Documentation (`/usr/share/doc`), Manual Pages (`/usr/share/man`), "
-        "License files (`/usr/share/licenses`), and Build IDs (`/usr/lib/.build-id`) are completely stripped (0 files present).\n"
+        "License files (`/usr/share/licenses`), and Build IDs (`/usr/lib/.build-id`) are completely stripped.\n"
     )
 
     md.append("## 1. Top-Level Directory Breakdown (Depth 1 & 2)\n")
     md.append("| Directory | Size (MiB) | Size (MB) | % of Image | Regular Files |")
     md.append("| :--- | :--- | :--- | :--- | :--- |")
     for d, s in sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True):
-        if d == "/" or d.count("/") == 2:
+        if d == "/" or d.count("/") in (1, 2):
             md.append(
                 f"| `{d}` | {s / (1024 * 1024):.2f} MiB | {s / 1000000:.2f} MB | {s * 100 / total_uncompressed:.1f}% | {dir_files[d]:,} |"
             )
 
-    md.append("\n## 2. Detailed Directory Breakdown (Depth 3)\n")
-    md.append("| Directory | Size (MiB) | Size (MB) | % of Image | File Count | Primary Contents |")
-    md.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
+    md.append(
+        f"\n## 2. Detailed Directory Breakdown (Depth 3 & 4, explaining > {min_pct:g}% or > 10 KB)\n"
+    )
+    md.append("| Directory | Depth | Size (MiB) | Size (MB) | % of Image | File Count | Primary Contents |")
+    md.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
     for d, s in sorted(dir_sizes.items(), key=lambda x: x[1], reverse=True):
-        if d.count("/") == 3 and s > 1024 * 10:  # > 10 KB
-            desc = ""
-            if "locale" in d:
-                desc = "Translation catalogs (.mo) and locale definitions"
-            elif "sysimage" in d:
-                desc = "Injected RPM SQLite database (rpmdb.sqlite)"
-            elif "ossl-modules" in d:
-                desc = "OpenSSL FIPS and legacy providers"
-            elif "pki" in d:
-                desc = "CA certificates bundle (ca-bundle.trust.crt)"
-            elif "terminfo" in d:
-                desc = "Terminal capabilities database"
-            elif "pkcs11" in d:
-                desc = "PKCS#11 trust modules"
-            elif "gawk" in d:
-                desc = "Gawk extensions and shared plugins"
-            elif "gconv" in d:
-                desc = "GNU C Library iconv character set conversion modules"
-            elif "engines-3" in d:
-                desc = "OpenSSL cryptographic engine plugins"
-            elif "krb5" in d:
-                desc = "Kerberos plugin modules"
-            elif "publicsuffix" in d:
-                desc = "Public Suffix List database (libpsl)"
-            elif "crypto-policies" in d:
-                desc = "System-wide cryptographic policy configurations"
-            elif "systemd" in d:
-                desc = "Systemd library support files"
-            elif "awk" in d:
-                desc = "Awk standard library routines"
+        depth = d.count("/")
+        pct = s * 100 / total_uncompressed
+        if (depth == 3 and s > 1024 * 10) or (3 <= depth <= max_depth and pct >= min_pct):
+            desc = describe_directory(d)
             md.append(
-                f"| `{d}` | {s / (1024 * 1024):.2f} MiB | {s / 1000000:.2f} MB | {s * 100 / total_uncompressed:.1f}% | {dir_files[d]} | {desc} |"
+                f"| `{d}` | {depth} | {s / (1024 * 1024):.2f} MiB | {s / 1000000:.2f} MB | {pct:.1f}% | {dir_files[d]} | {desc} |"
             )
 
     # Functional Categorization
@@ -187,16 +207,23 @@ def generate_report(tar_path: str, output_path: str):
         )
 
     md.append("\n## 5. Potential Future Optimizations\n")
+    locale_size = cat_sizes.get("Localization & Translations (locales)", 0)
+    if locale_size > 10 * 1024 * 1024:
+        md.append(
+            f"1. **Locale Trimming (`/usr/share/locale`)**: Currently accounts for **{locale_size / (1024 * 1024):.2f} MiB ({locale_size * 100 / total_uncompressed:.1f}%)** of the image. "
+            "Filtering out non-English translations (`locale/*` except `en*`, `C`, and `POSIX`) would reduce image size by ~20 MiB."
+        )
+    else:
+        md.append(
+            f"1. **Locale Trimming (`/usr/share/locale`)**: Implemented via `install_langs = \"en_US.UTF-8\"`. "
+            f"Non-English translation catalogs are stripped, leaving only {locale_size / (1024 * 1024):.2f} MiB ({locale_size * 100 / total_uncompressed:.1f}%) in the image."
+        )
     md.append(
-        "1. **Locale Trimming (`/usr/share/locale`)**: Currently accounts for **21.21 MiB (28.1%)** of the image. "
-        "Filtering out non-English translations (`locale/*` except `en*`, `C`, and `POSIX`) would reduce image size by ~20 MiB."
-    )
-    md.append(
-        "2. **RPM Database Overhead (`rpmdb.sqlite`)**: The SQLite database represents **6.84 MiB (9.1%)** of the image. "
+        "2. **RPM Database Overhead (`rpmdb.sqlite`)**: The SQLite database represents **6.84 MiB** of the image. "
         "For purely static or distroless containers that will never invoke `rpm` or `dnf` at runtime, omitting `rpmdb` from `rpm_layer` saves ~7 MB."
     )
     md.append(
-        "3. **CA Trust Store**: `/usr/share/pki/ca-trust-source/ca-bundle.trust.crt` is **2.49 MiB (3.3%)**. "
+        "3. **CA Trust Store**: `/usr/share/pki/ca-trust-source/ca-bundle.trust.crt` is **2.49 MiB**. "
         "This is required for SSL/TLS certificate verification in `curl`."
     )
 
@@ -207,9 +234,42 @@ def generate_report(tar_path: str, output_path: str):
     print(f"Generated {output_path} successfully")
 
 
-if __name__ == "__main__":
-    import sys
+def main():
+    parser = argparse.ArgumentParser(
+        description="Analyze disk usage of an image layer tarball and generate a Markdown report."
+    )
+    parser.add_argument(
+        "tar_path",
+        nargs="?",
+        default="e2e/scratch_image/bazel-bin/ol10_scratch_curl_amd64_layer_tar.tar",
+        help="Path to layer tarball",
+    )
+    parser.add_argument(
+        "output_path",
+        nargs="?",
+        default="docs/ol10-scratch-curl-disk-usage.md",
+        help="Path to markdown output file",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=4,
+        help="Maximum directory depth to inspect (default: 4)",
+    )
+    parser.add_argument(
+        "--min-pct",
+        type=float,
+        default=3.0,
+        help="Minimum percentage of image size to include deep directories (default: 3.0)",
+    )
+    args = parser.parse_args()
+    generate_report(
+        args.tar_path,
+        args.output_path,
+        max_depth=args.max_depth,
+        min_pct=args.min_pct,
+    )
 
-    tar_p = sys.argv[1] if len(sys.argv) > 1 else "e2e/scratch_image/bazel-bin/ol10_scratch_curl_amd64_layer_tar.tar"
-    out_p = sys.argv[2] if len(sys.argv) > 2 else "docs/ol10-scratch-curl-disk-usage.md"
-    generate_report(tar_p, out_p)
+
+if __name__ == "__main__":
+    main()

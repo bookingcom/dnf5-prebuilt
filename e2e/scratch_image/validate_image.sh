@@ -27,4 +27,14 @@ docker run --network none --rm "${IMAGE_TAG}" bash -c '
   done
 '
 
+echo "Checking that install_langs filtered out non-English locales..."
+docker run --network none --rm "${IMAGE_TAG}" bash -c '
+  for dir in /usr/share/locale/de /usr/share/locale/fr /usr/share/locale/es; do
+    if [ -d "$dir" ]; then
+      echo "Error: Directory $dir should have been excluded by install_langs!" >&2
+      exit 1
+    fi
+  done
+'
+
 echo "Scratch container validation passed successfully!"
