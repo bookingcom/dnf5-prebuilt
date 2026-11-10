@@ -1,7 +1,7 @@
 """Implementation of the rpm_extract rule and macro."""
 
-load("@bazel_lib//lib:utils.bzl", "propagate_common_rule_attributes")
 load("//dnf5-prebuilt/private:config.bzl", "DNF5_TOOLCHAIN")
+load("//dnf5-prebuilt/private:gpg.bzl", "gpg_attrs", "verify_rpms_gpg")
 
 TAR_TOOLCHAIN_TYPE = "@tar.bzl//tar/toolchain:type"
 
@@ -20,166 +20,80 @@ def _normalize_path(p):
         fail("Invalid path '%s': must not be empty or contain '..'" % p)
     return p
 
-def _rpm_extract_tree_impl(ctx):
-    out = ctx.actions.declare_directory(ctx.label.name)
+def _rpm_extract_impl(ctx):
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
 
-    extra_inputs = []
-    if ctx.attr.gpgcheck or ctx.files.gpgkeys:
-        dnf5_tc = ctx.toolchains[DNF5_TOOLCHAIN]
-        if not dnf5_tc:
-            fail("GPG validation in %s requires a registered dnf5 toolchain" % ctx.label)
-        dnf5 = dnf5_tc.dnf5_info
-        keystore_dir = ctx.actions.declare_directory(ctx.label.name + "_gpg_keystore")
+    gpg_inputs = verify_rpms_gpg(ctx)
 
-        ks_args = ctx.actions.args()
-        ks_args.add("--output", keystore_dir.path)
-        ks_inputs = []
-        if ctx.file.rpmdb:
-            ks_args.add("--rpmdb", ctx.file.rpmdb.path)
-            ks_inputs.append(ctx.file.rpmdb)
-        if ctx.files.gpgkeys:
-            for k in ctx.files.gpgkeys:
-                ks_args.add("--key", k.path)
-                ks_inputs.append(k)
+    declared_files = []
+    output_groups = {}
+    for f in ctx.attr.files:
+        out_f = ctx.actions.declare_file(ctx.label.name + "/" + f)
+        declared_files.append(out_f)
+        output_groups[f] = depset([out_f])
 
-        ctx.actions.run(
-            mnemonic = "RpmGpgKeystore",
-            progress_message = "Creating GPG keystore for %s" % ctx.label.name,
-            executable = ctx.executable._keystore_tool,
-            arguments = [ks_args],
-            inputs = depset(ks_inputs),
-            outputs = [keystore_dir],
-            use_default_shell_env = True,
-        )
+    declared_dirs = []
+    for d in ctx.attr.dirs:
+        out_d = ctx.actions.declare_directory(ctx.label.name + "/" + d)
+        declared_dirs.append(out_d)
+        output_groups[d] = depset([out_d])
 
-        keyring_type = "fs" if ctx.files.gpgkeys else "rpmdb"
-        for rpm in ctx.files.rpms:
-            verified_marker = ctx.actions.declare_file(ctx.label.name + "_" + rpm.basename + ".gpg_verified")
-            v_args = ctx.actions.args()
-            v_args.add("--rpm-bin", dnf5.rpm.path)
-            v_args.add("--rpmdb", keystore_dir.path)
-            v_args.add("--keyring", keyring_type)
-            v_args.add("--rpm", rpm.path)
-            v_args.add("--output", verified_marker.path)
-
-            ctx.actions.run(
-                mnemonic = "RpmGpgVerify",
-                progress_message = "Verifying GPG signature for %s" % rpm.basename,
-                executable = ctx.executable._verify_tool,
-                arguments = [v_args],
-                inputs = depset([rpm, keystore_dir], transitive = [dnf5.files]),
-                outputs = [verified_marker],
-                use_default_shell_env = True,
-            )
-            extra_inputs.append(verified_marker)
+    all_outputs = declared_files + declared_dirs
 
     args = ctx.actions.args()
     args.add("--bsdtar", bsdtar.path)
-    args.add("--output-dir", out.path)
     for rpm in ctx.files.rpms:
         args.add("--rpm", rpm.path)
-    for f in ctx.attr.files:
-        args.add("--file", f)
-    for d in ctx.attr.dirs:
-        args.add("--dir", d)
+    for f, out_f in zip(ctx.attr.files, declared_files):
+        args.add("--file")
+        args.add(f)
+        args.add(out_f.path)
+    for d, out_d in zip(ctx.attr.dirs, declared_dirs):
+        args.add("--dir")
+        args.add(d)
+        args.add(out_d.path)
 
     ctx.actions.run(
-        mnemonic = "RpmExtractTree",
-        progress_message = "Extracting entries from RPMs into %s" % out.short_path,
+        mnemonic = "RpmExtract",
+        progress_message = "Extracting entries from RPMs for %s" % ctx.label.name,
         executable = ctx.executable._extract_tool,
         arguments = [args],
-        inputs = depset(ctx.files.rpms + extra_inputs, transitive = [tar_toolchain.default.files]),
-        outputs = [out],
+        inputs = depset(ctx.files.rpms + gpg_inputs, transitive = [tar_toolchain.default.files]),
+        outputs = all_outputs,
         env = tar_toolchain.tarinfo.default_env,
     )
-    return [DefaultInfo(files = depset([out]))]
 
-rpm_extract_tree = rule(
-    doc = "Extracts requested files and directories from RPMs into an intermediate directory.",
-    implementation = _rpm_extract_tree_impl,
-    attrs = {
-        "dirs": attr.string_list(doc = "List of directory paths to extract."),
-        "files": attr.string_list(doc = "List of file paths to extract."),
-        "gpgcheck": attr.bool(
-            default = False,
-            doc = "Enable GPG signature validation of RPMs.",
-        ),
-        "gpgkeys": attr.label_list(
-            allow_files = True,
-            doc = "Optional list of GPG public key files.",
-        ),
-        "rpmdb": attr.label(
-            allow_single_file = True,
-            doc = "Optional rpmdb SQLite file containing GPG keys.",
-        ),
-        "rpms": attr.label_list(
-            allow_files = [".rpm"],
-            mandatory = True,
-            doc = "RPM package files to extract from.",
-        ),
-        "_extract_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_extract"),
-            executable = True,
-            cfg = "exec",
-        ),
-        "_keystore_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_gpg_keystore"),
-            executable = True,
-            cfg = "exec",
-        ),
-        "_verify_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_gpg_verify"),
-            executable = True,
-            cfg = "exec",
-        ),
-    },
+    all_depset = depset(all_outputs)
+    return [
+        DefaultInfo(files = all_depset, runfiles = ctx.runfiles(files = all_outputs)),
+        OutputGroupInfo(**output_groups),
+    ]
+
+_rpm_extract_attrs = {
+    "dirs": attr.string_list(doc = "List of directory paths to extract."),
+    "files": attr.string_list(doc = "List of file paths to extract."),
+    "rpms": attr.label_list(
+        allow_files = [".rpm"],
+        mandatory = True,
+        doc = "RPM package files to extract from.",
+    ),
+    "_extract_tool": attr.label(
+        default = Label("//dnf5-prebuilt/private:rpm_extract"),
+        executable = True,
+        cfg = "exec",
+    ),
+}
+_rpm_extract_attrs.update(gpg_attrs())
+
+_rpm_extract = rule(
+    doc = "Extracts requested files and directories from RPMs in a single action, dereferencing all symlinks.",
+    implementation = _rpm_extract_impl,
+    attrs = _rpm_extract_attrs,
     toolchains = [
         TAR_TOOLCHAIN_TYPE,
         config_common.toolchain_type(str(DNF5_TOOLCHAIN), mandatory = False),
     ],
-)
-
-def _rpm_extract_entry_impl(ctx):
-    if ctx.attr.is_dir:
-        out = ctx.actions.declare_directory(ctx.label.name)
-    else:
-        out = ctx.actions.declare_file(ctx.label.name)
-
-    args = ctx.actions.args()
-    args.add("--src", ctx.file.tree.path + "/" + ctx.attr.path)
-    args.add("--dst", out.path)
-    if ctx.attr.is_dir:
-        args.add("--is-dir")
-
-    ctx.actions.run(
-        mnemonic = "RpmExtractEntry",
-        progress_message = "Exposing extracted %s" % ctx.label.name,
-        executable = ctx.executable._tool,
-        arguments = [args],
-        inputs = [ctx.file.tree],
-        outputs = [out],
-    )
-    return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = [out]))]
-
-rpm_extract_entry = rule(
-    doc = "Exposes a single extracted file or directory from an extracted tree. Extracted files that are symlinks in the RPM are dereferenced into standalone regular files.",
-    implementation = _rpm_extract_entry_impl,
-    attrs = {
-        "is_dir": attr.bool(default = False, doc = "Whether the entry is a directory."),
-        "path": attr.string(mandatory = True, doc = "Relative path of entry in tree."),
-        "tree": attr.label(
-            allow_single_file = True,
-            mandatory = True,
-            doc = "Extracted tree directory.",
-        ),
-        "_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_extract_entry"),
-            executable = True,
-            cfg = "exec",
-        ),
-    },
 )
 
 def rpm_extract(
@@ -187,29 +101,27 @@ def rpm_extract(
         rpms,
         files = [],
         dirs = [],
-        directories = [],
         gpgcheck = False,
         gpgkeys = [],
         rpmdb = None,
         **kwargs):
     """Extracts requested files and directories from RPM packages and makes them available as targets.
 
-    The target names match the fully-qualified relative paths passed in `files` and `dirs`,
-    and are not shortened to basenames. If any extracted file is a symlink in the RPM,
-    it is automatically dereferenced into a standalone regular file.
+    The target names are prefixed with `name + "/" + path` (e.g. `:my_extract/usr/bin/curl`).
+    The top-level target `:name` provides all extracted files and directories.
+    If any extracted entry is or contains a symlink in the RPM, it is automatically
+    dereferenced into regular files and directories.
 
     Args:
-      name: Target name for the aggregate filegroup.
+      name: Target name for the aggregate extraction rule.
       rpms: List of RPM package files (.rpm).
       files: List of file paths to extract from the RPMs (e.g. ['usr/bin/curl']).
       dirs: List of directory paths to extract from the RPMs (e.g. ['etc/pki/tls']).
-      directories: Alias for dirs.
       gpgcheck: Optional boolean flag to enable GPG signature validation of RPMs.
       gpgkeys: Optional list of GPG public key files. Automatically enables gpgcheck.
       rpmdb: Optional rpmdb SQLite database file containing trusted GPG keys.
       **kwargs: Extra common rule attributes (e.g. visibility, tags).
     """
-    raw_dirs = list(dirs) + list(directories)
     norm_files = []
     seen_files = {}
     for f in files:
@@ -220,7 +132,7 @@ def rpm_extract(
 
     norm_dirs = []
     seen_dirs = {}
-    for d in raw_dirs:
+    for d in dirs:
         nd = _normalize_path(d)
         if nd not in seen_dirs:
             seen_dirs[nd] = True
@@ -233,46 +145,32 @@ def rpm_extract(
         if nf in seen_dirs:
             fail("Path '%s' in rpm_extract target '%s' cannot be specified in both files and dirs" % (nf, name))
 
-    common_kwargs = propagate_common_rule_attributes(kwargs)
-    intermediate_kwargs = dict(common_kwargs)
-    intermediate_kwargs["visibility"] = ["//visibility:private"]
+    if name in seen_files or name in seen_dirs:
+        fail("rpm_extract target name '%s' cannot be identical to an extracted path in files or dirs" % name)
 
-    tree_name = "_" + name + "_tree"
-    rpm_extract_tree(
-        name = tree_name,
+    _rpm_extract(
+        name = name,
         rpms = rpms,
         files = norm_files,
         dirs = norm_dirs,
-        gpgcheck = gpgcheck or bool(gpgkeys),
+        gpgcheck = gpgcheck,
         gpgkeys = gpgkeys,
         rpmdb = rpmdb,
-        **intermediate_kwargs
+        **kwargs
     )
 
-    all_targets = []
     for f in norm_files:
-        rpm_extract_entry(
-            name = f,
-            tree = ":" + tree_name,
-            path = f,
-            is_dir = False,
+        native.filegroup(
+            name = name + "/" + f,
+            srcs = [":" + name],
+            output_group = f,
             **kwargs
         )
-        all_targets.append(":" + f)
 
     for d in norm_dirs:
-        rpm_extract_entry(
-            name = d,
-            tree = ":" + tree_name,
-            path = d,
-            is_dir = True,
-            **kwargs
-        )
-        all_targets.append(":" + d)
-
-    if name not in seen_files and name not in seen_dirs:
         native.filegroup(
-            name = name,
-            srcs = all_targets,
+            name = name + "/" + d,
+            srcs = [":" + name],
+            output_group = d,
             **kwargs
         )

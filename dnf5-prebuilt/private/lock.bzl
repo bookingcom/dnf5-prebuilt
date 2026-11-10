@@ -184,12 +184,17 @@ _RPM_LOCK_ATTRS.update({
         doc = "Distribution release version (--releasever), e.g. '9'.",
     ),
     "repo_configs": attr.label_list(
-        allow_files = [".repo", ".conf"],
-        doc = "The .repo files defining repository configurations.",
+        allow_files = True,
+        doc = "The .repo files or directory artifacts defining repository configurations.",
     ),
     "repo_files": attr.label_list(
         allow_files = True,
         doc = "Repository metadata files (repodata XMLs, signatures) needed during dependency resolution.",
+    ),
+    "_render_repos_d_tool": attr.label(
+        default = Label("//dnf5-prebuilt/private:render_repos_d"),
+        executable = True,
+        cfg = "exec",
     ),
 })
 

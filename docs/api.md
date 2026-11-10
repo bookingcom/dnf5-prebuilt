@@ -113,20 +113,19 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 ### `rpm_extract`
 
 ```starlark
-rpm_extract(name, rpms, files = [], dirs = [], directories = [], gpgcheck = False, gpgkeys = [], rpmdb = None, **kwargs)
+rpm_extract(name, rpms, files = [], dirs = [], gpgcheck = False, gpgkeys = [], rpmdb = None, **kwargs)
 ```
 
-Macro that extracts specific files and directories from RPM packages and makes them available as individual targets in Bazel. Target names match the fully-qualified relative paths passed in `files` and `dirs`, rather than being shortened to their basename (e.g. `usr/bin/curl` instead of `curl`).
+Macro that extracts specific files and directories from RPM packages and makes them available as individual targets in Bazel in a single action. Target names are prefixed with `name + "/" + path` (e.g. `:my_extract/usr/bin/curl`), preserving the fully-qualified relative path rather than shortening to basenames, preventing collisions when multiple `rpm_extract` macros in the same package extract similar paths.
 
 #### Parameters
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `name` | `string` | *mandatory* | Aggregate target name (exposes a `filegroup` containing all extracted targets). |
+| `name` | `string` | *mandatory* | Aggregate target name. Exposes all extracted files and directories. |
 | `rpms` | `list of labels` | *mandatory* | List of RPM package files (`.rpm`) to extract from. |
 | `files` | `list of strings` | `[]` | List of file paths to extract from the RPMs (e.g. `["usr/bin/curl", "usr/lib64/libcurl.so.4"]`). |
 | `dirs` | `list of strings` | `[]` | List of directory paths to extract from the RPMs (e.g. `["etc/pki/tls", "usr/share/curl"]`). |
-| `directories` | `list of strings` | `[]` | Alias for `dirs`. |
 | `gpgcheck` | `bool` | `False` | Optional flag to enable GPG signature validation of all RPM packages prior to extraction. Automatically enabled if `gpgkeys` is provided. |
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
@@ -134,14 +133,14 @@ Macro that extracts specific files and directories from RPM packages and makes t
 
 #### Target Names and Visibility
 
-Every path specified in `files` and `dirs` becomes a first-class Bazel target in the package where `rpm_extract` is called:
-- File paths (e.g. `"usr/bin/curl"` or `"/usr/bin/curl"`) produce file targets named `:usr/bin/curl` (`//package:usr/bin/curl`).
-- Directory paths (e.g. `"etc/pki/tls"` or `"/etc/pki/tls/"`) produce directory TreeArtifact targets named `:etc/pki/tls` (`//package:etc/pki/tls`).
-- The aggregate target `:<name>` (`//package:<name>`) builds and provides all extracted files and directories.
+Every path specified in `files` and `dirs` produces a target prefixed by `<name>/`:
+- File paths (e.g. `"usr/bin/curl"` or `"/usr/bin/curl"`) produce file targets named `:<name>/usr/bin/curl` (`//package:<name>/usr/bin/curl`).
+- Directory paths (e.g. `"etc/pki/tls"` or `"/etc/pki/tls/"`) produce directory TreeArtifact targets named `:<name>/etc/pki/tls` (`//package:<name>/etc/pki/tls`).
+- The aggregate target `:<name>` (`//package:<name>`) builds and provides all extracted files and directories in a single action.
 
 #### Symlink Dereferencing
 
-If any extracted file in `files` is a symbolic link in the RPM package (such as versioned shared libraries, e.g. `/usr/lib64/libcurl.so.4 -> libcurl.so.4.7.0`), `rpm_extract` automatically resolves and follows the symlink chain across the provided RPMs. The file is dereferenced upon extraction, ensuring the resulting Bazel target is a standalone regular file containing the real file's content and permissions rather than a dangling symlink.
+If any extracted file or directory is or contains a symbolic link in the RPM package (including relative links, links climbing past root `../..` which are clamped at the tree root, and absolute links like `/usr/lib64/libcurl.so.4.7.0`), `rpm_extract` automatically resolves and follows the symlink chain across all provided RPMs. Every entry is fully dereferenced upon extraction, ensuring that all output targets are real files and directories rather than dangling or host-dependent symlinks. If a symlink target cannot be found in any of the provided RPM packages, extraction fails with an error.
 
 #### Example
 
@@ -165,14 +164,14 @@ rpm_extract(
     ],
 )
 
-# Reference individual targets by their fully-qualified path:
+# Reference individual targets by their name-prefixed fully-qualified path:
 sh_binary(
     name = "my_tool",
     srcs = ["run.sh"],
     data = [
-        ":usr/bin/curl",
-        ":usr/lib64/libcurl.so.4",
-        ":usr/share/licenses/libcurl",
+        ":curl_extracted/usr/bin/curl",
+        ":curl_extracted/usr/lib64/libcurl.so.4",
+        ":curl_extracted/usr/share/licenses/libcurl",
     ],
 )
 ```
@@ -363,7 +362,7 @@ Rule that renders a hermetic `dnf.conf` and repository drop-ins under `repos.d/`
 | `name` | `string` | *mandatory* | Target name. |
 | `arch` | `list of strings` | *mandatory* | Target CPU architectures (e.g. `["x86_64", "noarch"]`). |
 | `releasever` | `string` | *mandatory* | Distribution release version passed to `--releasever` (e.g. `"9"`). |
-| `repo_configs` | `list of labels` | *mandatory* | Template `.repo` or `.conf` files. `@REPO_DIR@` is expanded to the repository directory. |
+| `repo_configs` | `list of labels` | *mandatory* | Template `.repo` or `.conf` files, or directory artifacts containing `.repo` files (e.g. extracted via `rpm_extract` or container image extraction). `@REPO_DIR@` is expanded to the repository directory. |
 | `repo_files` | `list of labels` | `[]` | Repository files (repodata XMLs, signatures). |
 | `forcearch` | `string` | `""` | Forced solver architecture. Defaults to first non-noarch entry in `arch`. |
 | `nobest` | `bool` | `False` | Allow older candidates when newest requested package cannot be installed. |

@@ -44,6 +44,6 @@ py_binary(
 )
 
 py_binary(
-    name = "rpm_extract_entry",
-    srcs = ["rpm_extract_entry.py"],
+    name = "render_repos_d",
+    srcs = ["render_repos_d.py"],
 )

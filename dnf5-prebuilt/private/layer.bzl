@@ -2,6 +2,7 @@
 
 load("@bazel_lib//lib:utils.bzl", "propagate_common_rule_attributes")
 load("//dnf5-prebuilt/private:config.bzl", "DNF5_TOOLCHAIN")
+load("//dnf5-prebuilt/private:gpg.bzl", "gpg_attrs", "verify_rpms_gpg")
 
 TAR_TOOLCHAIN_TYPE = "@tar.bzl//tar/toolchain:type"
 
@@ -10,52 +11,7 @@ def _rpm_merge_impl(ctx):
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
 
-    extra_inputs = []
-    if ctx.attr.gpgcheck:
-        keystore_dir = ctx.actions.declare_directory(ctx.label.name + "_gpg_keystore")
-        dnf5 = ctx.toolchains[DNF5_TOOLCHAIN].dnf5_info
-
-        ks_args = ctx.actions.args()
-        ks_args.add("--output", keystore_dir.path)
-        ks_inputs = []
-        if ctx.file.rpmdb:
-            ks_args.add("--rpmdb", ctx.file.rpmdb.path)
-            ks_inputs.append(ctx.file.rpmdb)
-        if ctx.files.gpgkeys:
-            for k in ctx.files.gpgkeys:
-                ks_args.add("--key", k.path)
-                ks_inputs.append(k)
-
-        ctx.actions.run(
-            mnemonic = "RpmGpgKeystore",
-            progress_message = "Creating GPG keystore for %s" % ctx.label.name,
-            executable = ctx.executable._keystore_tool,
-            arguments = [ks_args],
-            inputs = depset(ks_inputs),
-            outputs = [keystore_dir],
-            use_default_shell_env = True,
-        )
-
-        keyring_type = "fs" if ctx.files.gpgkeys else "rpmdb"
-        for rpm in ctx.files.rpms:
-            verified_marker = ctx.actions.declare_file(ctx.label.name + "_" + rpm.basename + ".gpg_verified")
-            v_args = ctx.actions.args()
-            v_args.add("--rpm-bin", dnf5.rpm.path)
-            v_args.add("--rpmdb", keystore_dir.path)
-            v_args.add("--keyring", keyring_type)
-            v_args.add("--rpm", rpm.path)
-            v_args.add("--output", verified_marker.path)
-
-            ctx.actions.run(
-                mnemonic = "RpmGpgVerify",
-                progress_message = "Verifying GPG signature for %s" % rpm.basename,
-                executable = ctx.executable._verify_tool,
-                arguments = [v_args],
-                inputs = depset([rpm, keystore_dir], transitive = [dnf5.files]),
-                outputs = [verified_marker],
-                use_default_shell_env = True,
-            )
-            extra_inputs.append(verified_marker)
+    extra_inputs = verify_rpms_gpg(ctx)
 
     args = ctx.actions.args()
     args.add("-cf", out)
@@ -80,34 +36,12 @@ def _rpm_merge_impl(ctx):
 rpm_merge = rule(
     doc = "Merges RPM packages into an uncompressed tar archive using bsdtar.",
     implementation = _rpm_merge_impl,
-    attrs = {
-        "gpgcheck": attr.bool(
-            default = False,
-            doc = "Enable GPG signature validation of RPMs.",
-        ),
-        "gpgkeys": attr.label_list(
-            allow_files = True,
-            doc = "Optional list of GPG public key files.",
-        ),
+    attrs = gpg_attrs() | {
         "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
-        "rpmdb": attr.label(
-            allow_single_file = True,
-            doc = "Optional rpmdb SQLite file containing GPG keys.",
-        ),
         "rpms": attr.label_list(
             allow_files = [".rpm"],
             mandatory = True,
             doc = "RPM package files to extract and merge.",
-        ),
-        "_keystore_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_gpg_keystore"),
-            executable = True,
-            cfg = "exec",
-        ),
-        "_verify_tool": attr.label(
-            default = Label("//dnf5-prebuilt/private:rpm_gpg_verify"),
-            executable = True,
-            cfg = "exec",
         ),
     },
     toolchains = [TAR_TOOLCHAIN_TYPE, DNF5_TOOLCHAIN],
