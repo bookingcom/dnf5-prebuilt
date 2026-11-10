@@ -14,6 +14,11 @@ if [[ ! -x "${CURL_BIN}" ]]; then
   echo "Error: curl binary '${CURL_BIN}' is not executable" >&2
   exit 1
 fi
+ACTUAL_CURL=$(readlink "${CURL_BIN}" || echo "${CURL_BIN}")
+if [[ -L "${ACTUAL_CURL}" ]]; then
+  echo "Error: extracted artifact '${ACTUAL_CURL}' is a symlink, expected regular file" >&2
+  exit 1
+fi
 
 echo "Checking libcurl library: ${LIBCURL_SO}"
 if [[ ! -f "${LIBCURL_SO}" ]]; then
@@ -22,6 +27,12 @@ if [[ ! -f "${LIBCURL_SO}" ]]; then
 fi
 if [[ ! -s "${LIBCURL_SO}" ]]; then
   echo "Error: libcurl '${LIBCURL_SO}' is empty" >&2
+  exit 1
+fi
+# Verify that the extracted artifact is dereferenced and not a symlink in the output tree
+ACTUAL_SO=$(readlink "${LIBCURL_SO}" || echo "${LIBCURL_SO}")
+if [[ -L "${ACTUAL_SO}" ]]; then
+  echo "Error: extracted artifact '${ACTUAL_SO}' is a symlink, expected it to be dereferenced" >&2
   exit 1
 fi
 

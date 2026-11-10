@@ -139,6 +139,10 @@ Every path specified in `files` and `dirs` becomes a first-class Bazel target in
 - Directory paths (e.g. `"etc/pki/tls"` or `"/etc/pki/tls/"`) produce directory TreeArtifact targets named `:etc/pki/tls` (`//package:etc/pki/tls`).
 - The aggregate target `:<name>` (`//package:<name>`) builds and provides all extracted files and directories.
 
+#### Symlink Dereferencing
+
+If any extracted file in `files` is a symbolic link in the RPM package (such as versioned shared libraries, e.g. `/usr/lib64/libcurl.so.4 -> libcurl.so.4.7.0`), `rpm_extract` automatically resolves and follows the symlink chain across the provided RPMs. The file is dereferenced upon extraction, ensuring the resulting Bazel target is a standalone regular file containing the real file's content and permissions rather than a dangling symlink.
+
 #### Example
 
 ```starlark

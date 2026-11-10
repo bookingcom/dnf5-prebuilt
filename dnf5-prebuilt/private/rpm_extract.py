@@ -31,6 +31,7 @@ def main():
 
     found_files = set()
     found_dirs = set()
+    rpm_data = []
 
     for rpm_path in args.rpm:
         if not os.path.exists(rpm_path):
@@ -43,21 +44,23 @@ def main():
             sys.stderr.write(f"Error listing contents of RPM '{rpm_path}':\n{list_res.stderr}\n")
             sys.exit(list_res.returncode)
 
-        rpm_entries = {}
+        entries = {}
         for line in list_res.stdout.splitlines():
             orig = line.strip()
             norm = normalize_path(orig)
             if norm:
-                rpm_entries[norm] = orig
+                entries[norm] = orig
+
+        rpm_data.append((rpm_path, entries))
 
         extract_args = []
         for f in req_files:
-            if f in rpm_entries:
-                extract_args.append(rpm_entries[f])
+            if f in entries:
+                extract_args.append(entries[f])
                 found_files.add(f)
 
         for d in req_dirs:
-            matching = [orig for norm, orig in rpm_entries.items() if norm == d or norm.startswith(d + "/")]
+            matching = [orig for norm, orig in entries.items() if norm == d or norm.startswith(d + "/")]
             if matching:
                 extract_args.extend(matching)
                 found_dirs.add(d)
@@ -80,18 +83,50 @@ def main():
                 sys.stderr.write(f"Error extracting files from RPM '{rpm_path}':\n{extract_res.stderr}\n")
                 sys.exit(extract_res.returncode)
 
-            # Auto-extract relative symlink targets within this RPM if any
-            for f in req_files:
-                extracted_f = os.path.join(args.output_dir, f)
-                if os.path.islink(extracted_f):
-                    target = os.readlink(extracted_f)
-                    if not os.path.isabs(target):
-                        resolved = normalize_path(os.path.normpath(os.path.join(os.path.dirname(f), target)))
-                        if resolved in rpm_entries and not os.path.lexists(os.path.join(args.output_dir, resolved)):
-                            subprocess.run(
-                                [args.bsdtar, "-xf", rpm_path, "-C", args.output_dir, rpm_entries[resolved]],
-                                check=False,
-                            )
+    # Follow and extract any symlink targets across all provided RPMs so symlinks can be dereferenced
+    out_dir_abs = os.path.abspath(args.output_dir)
+    for f in req_files:
+        full_path = os.path.join(args.output_dir, f)
+        visited = set()
+        while os.path.islink(full_path):
+            if full_path in visited:
+                sys.stderr.write(f"Error: circular symlink detected for '{f}'\n")
+                sys.exit(1)
+            visited.add(full_path)
+
+            target = os.readlink(full_path)
+            if os.path.isabs(target):
+                norm_target = normalize_path(target)
+            else:
+                rel_dir = os.path.dirname(full_path)
+                abs_target = os.path.normpath(os.path.join(rel_dir, target))
+                abs_target_norm = os.path.abspath(abs_target)
+                if abs_target_norm.startswith(out_dir_abs + os.sep):
+                    norm_target = normalize_path(abs_target_norm[len(out_dir_abs) + 1:])
+                else:
+                    norm_target = normalize_path(abs_target)
+
+            target_on_disk = os.path.join(args.output_dir, norm_target)
+            if not os.path.lexists(target_on_disk):
+                # Search all RPMs in reverse order (to prefer latest package version)
+                extracted_target = False
+                for rpm_path, entries in reversed(rpm_data):
+                    if norm_target in entries:
+                        res = subprocess.run(
+                            [args.bsdtar, "-xf", rpm_path, "-C", args.output_dir, entries[norm_target]],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res.returncode == 0:
+                            extracted_target = True
+                            break
+                if not extracted_target:
+                    sys.stderr.write(
+                        f"Warning: symlink target '{norm_target}' for '{f}' could not be extracted from RPMs.\n"
+                    )
+                    break
+
+            full_path = target_on_disk
 
     # Check for missing files or directories
     missing_files = [f for f in req_files if f not in found_files]
