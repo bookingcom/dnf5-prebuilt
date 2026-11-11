@@ -32,10 +32,8 @@ build --output_filter=^$
 build --local_resources=cpu=HOST_CPUS-2
 build --local_test_jobs=HOST_CPUS-2
 build --nobuild_runfile_links
-# curl (librepo, config-manager plugin): OpenSSL backend and non-HTTP
-# protocols (file:// repositories).
+# curl (librepo, config-manager plugin): OpenSSL backend.
 build --@curl//:ssl_lib=openssl
-build --@curl//:http_only=false
 
 # Bazel RBE configuration profile targeting //bazel:ubuntu24_04_amd64
 # The container image of remote actions can be overridden (e.g. in .bazelrc.user) with
