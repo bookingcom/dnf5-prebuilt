@@ -1,3 +1,4 @@
+load("@aspect_rules_py//py:defs.bzl", "py_binary")
 load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "dnf_config", "rpm_layer", "rpm_lock", "rpm_mark")
 load("@rules_img//img:image.bzl", "image_manifest")
 load("@rules_img//img:layer.bzl", "layer_from_tar")
@@ -114,18 +115,26 @@ rpm_layer(
     rpms = ["@ol10_scratch_curl_arm64//:rpms"],
 )
 
+# Wrap validation script in hermetic py_binary
+py_binary(
+    name = "test_layer_symlinks_bin",
+    srcs = ["test_layer_symlinks.py"],
+    main = "test_layer_symlinks.py",
+)
+
 # Test that rpm_layer archives contain no entries with symlinked parents (issue #48)
 sh_test(
     name = "test_layer_no_symlinked_parents",
     srcs = ["run_layer_symlinks_test.sh"],
     args = [
+        "$(rootpath :test_layer_symlinks_bin)",
         "$(rootpath :ol10_scratch_curl_amd64_layer_tar)",
         "$(rootpath :ol10_scratch_curl_arm64_layer_tar)",
     ],
     data = [
-        "test_layer_symlinks.py",
         ":ol10_scratch_curl_amd64_layer_tar",
         ":ol10_scratch_curl_arm64_layer_tar",
+        ":test_layer_symlinks_bin",
     ],
 )
 

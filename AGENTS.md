@@ -37,6 +37,10 @@ is; this file records the rules and the non-obvious lessons.
   rules (see `bazel/release/dist.bzl`). Languages: C/C++ (hermetic LLVM), Rust
   via `rules_rs`, Python via `aspect_rules_py` if ever needed; ask the user
   before introducing anything else.
+- **Hermetic Python in tests.** Never invoke `python3` directly from the host in
+  tests or shell runner scripts (`run_*.sh`). Wrap Python scripts with `py_binary`
+  (from `aspect_rules_py`) and run the hermetic binary target instead, passing it
+  to shell test runners via `$(rootpath ...)`.
 - Resolve versions from the registry (`https://bcr.bazel.build/modules/<m>/metadata.json`)
   or upstream tags; never from memory.
 
