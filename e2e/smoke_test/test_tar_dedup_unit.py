@@ -183,6 +183,204 @@ class TarDedupUnitTest(unittest.TestCase):
             self.assertNotIn("usr/share/locale/fr/LC_MESSAGES", names)
             self.assertNotIn("usr/share/locale/fr/LC_MESSAGES/curl.mo", names)
 
+    def test_canonicalization_symlinked_parent(self):
+        in_tar = os.path.join(self.temp_dir.name, "symlink_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "symlink_out.tar")
+
+        members = [
+            ("usr/lib64", "dir", b""),
+            ("lib64", "symlink", "usr/lib64"),
+            ("lib64/libgcc_s-14-20251022.so.1", "file", b"libgcc_binary"),
+            ("lib64/libgcc_s.so.1", "symlink", "libgcc_s-14-20251022.so.1"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            # Top-level symlink lib64 -> usr/lib64 is preserved
+            self.assertIn("lib64", members_out)
+            self.assertTrue(members_out["lib64"].issym())
+            self.assertEqual(members_out["lib64"].linkname, "usr/lib64")
+
+            # Entries under lib64/ are rewritten to usr/lib64/
+            self.assertNotIn("lib64/libgcc_s-14-20251022.so.1", members_out)
+            self.assertNotIn("lib64/libgcc_s.so.1", members_out)
+            self.assertIn("usr/lib64/libgcc_s-14-20251022.so.1", members_out)
+            self.assertIn("usr/lib64/libgcc_s.so.1", members_out)
+
+            # Symlink target remains unchanged
+            self.assertEqual(members_out["usr/lib64/libgcc_s.so.1"].linkname, "libgcc_s-14-20251022.so.1")
+
+    def test_canonicalization_nested_symlinked_parents(self):
+        in_tar = os.path.join(self.temp_dir.name, "nested_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "nested_out.tar")
+
+        members = [
+            ("a", "symlink", "b"),
+            ("b/c", "symlink", "../d"),
+            ("a/c/nested_file.txt", "file", b"nested_data"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            self.assertIn("d/nested_file.txt", members_out)
+            self.assertNotIn("a/c/nested_file.txt", members_out)
+            self.assertNotIn("b/c/nested_file.txt", members_out)
+            with t.extractfile(members_out["d/nested_file.txt"]) as f:
+                self.assertEqual(f.read(), b"nested_data")
+
+    def test_canonicalization_relative_link_sibling(self):
+        in_tar = os.path.join(self.temp_dir.name, "sibling_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "sibling_out.tar")
+
+        members = [
+            ("lib64", "symlink", "usr/lib64"),
+            ("lib64/libfoo.so.1.0", "file", b"foo_content"),
+            ("lib64/libfoo.so.1", "symlink", "libfoo.so.1.0"),
+            ("lib64/libfoo.so", "symlink", "libfoo.so.1"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            self.assertIn("usr/lib64/libfoo.so.1.0", members_out)
+            self.assertIn("usr/lib64/libfoo.so.1", members_out)
+            self.assertIn("usr/lib64/libfoo.so", members_out)
+            self.assertEqual(members_out["usr/lib64/libfoo.so.1"].linkname, "libfoo.so.1.0")
+            self.assertEqual(members_out["usr/lib64/libfoo.so"].linkname, "libfoo.so.1")
+
+    def test_canonicalization_collision(self):
+        in_tar = os.path.join(self.temp_dir.name, "collision_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "collision_out.tar")
+
+        members = [
+            ("lib64", "symlink", "usr/lib64"),
+            ("usr/lib64/duplicate.txt", "file", b"first_content"),
+            ("lib64/duplicate.txt", "file", b"second_content"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            names = [m.name for m in t.getmembers()]
+            self.assertEqual(names.count("usr/lib64/duplicate.txt"), 1)
+            self.assertNotIn("lib64/duplicate.txt", names)
+
+    def test_canonicalization_type_conflict(self):
+        # 1. Directory followed by file at same canonical path
+        in_tar1 = os.path.join(self.temp_dir.name, "conflict1_in.tar")
+        out_tar1 = os.path.join(self.temp_dir.name, "conflict1_out.tar")
+        members1 = [
+            ("lib64", "symlink", "usr/lib64"),
+            ("usr/lib64/conflict", "dir", b""),
+            ("lib64/conflict", "file", b"file_content"),
+        ]
+        make_tar(in_tar1, members1)
+
+        cmd1 = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar1,
+            "--output",
+            out_tar1,
+        ]
+        res1 = subprocess.run(cmd1, capture_output=True, text=True)
+        self.assertNotEqual(res1.returncode, 0)
+        self.assertIn("Type conflict", res1.stderr)
+
+        # 2. File followed by directory at same canonical path
+        in_tar2 = os.path.join(self.temp_dir.name, "conflict2_in.tar")
+        out_tar2 = os.path.join(self.temp_dir.name, "conflict2_out.tar")
+        members2 = [
+            ("lib64", "symlink", "usr/lib64"),
+            ("usr/lib64/conflict", "file", b"file_content"),
+            ("lib64/conflict", "dir", b""),
+        ]
+        make_tar(in_tar2, members2)
+
+        cmd2 = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar2,
+            "--output",
+            out_tar2,
+        ]
+        res2 = subprocess.run(cmd2, capture_output=True, text=True)
+        self.assertNotEqual(res2.returncode, 0)
+        self.assertIn("Type conflict", res2.stderr)
+
+    def test_canonicalization_absolute_symlink_outside_layer(self):
+        in_tar = os.path.join(self.temp_dir.name, "abs_symlink_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "abs_symlink_out.tar")
+
+        members = [
+            ("etc/resolv.conf", "symlink", "/run/systemd/resolve/stub-resolv.conf"),
+            ("dev/fd", "symlink", "/proc/self/fd"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            self.assertEqual(members_out["etc/resolv.conf"].linkname, "/run/systemd/resolve/stub-resolv.conf")
+            self.assertEqual(members_out["dev/fd"].linkname, "/proc/self/fd")
+
 
 if __name__ == "__main__":
     unittest.main()
