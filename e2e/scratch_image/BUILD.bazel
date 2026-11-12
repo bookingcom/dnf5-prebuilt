@@ -114,6 +114,21 @@ rpm_layer(
     rpms = ["@ol10_scratch_curl_arm64//:rpms"],
 )
 
+# Test that rpm_layer archives contain no entries with symlinked parents (issue #48)
+sh_test(
+    name = "test_layer_no_symlinked_parents",
+    srcs = ["run_layer_symlinks_test.sh"],
+    args = [
+        "$(rootpath :ol10_scratch_curl_amd64_layer_tar)",
+        "$(rootpath :ol10_scratch_curl_arm64_layer_tar)",
+    ],
+    data = [
+        "test_layer_symlinks.py",
+        ":ol10_scratch_curl_amd64_layer_tar",
+        ":ol10_scratch_curl_arm64_layer_tar",
+    ],
+)
+
 # Build OCI layer and image manifest on top of scratch base
 layer_from_tar(
     name = "ol10_scratch_curl_amd64_layer",
