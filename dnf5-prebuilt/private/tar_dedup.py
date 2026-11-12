@@ -132,9 +132,17 @@ def canonicalize_path(norm: str, symlink_map: dict[str, str]) -> str:
     return basename
 
 
+USR_MERGE_DIRS = {
+    "bin": "usr/bin",
+    "sbin": "usr/sbin",
+    "lib": "usr/lib",
+    "lib64": "usr/lib64",
+}
+
+
 def build_symlink_map(src: tarfile.TarFile) -> dict[str, str]:
     """Collects all symbolic links from the archive and indexes their canonical paths."""
-    raw_symlinks: dict[str, str] = {}
+    raw_symlinks: dict[str, str] = dict(USR_MERGE_DIRS)
     for member in src:
         if member.issym():
             name = normalize_entry_name(member.name)
@@ -176,7 +184,12 @@ def main() -> int:
             for member in src:
                 norm = normalize_entry_name(member.name)
 
-                if member.isdir():
+                if norm in USR_MERGE_DIRS:
+                    if member.issym():
+                        canon = norm
+                    else:
+                        canon = USR_MERGE_DIRS[norm]
+                elif member.isdir():
                     canon = resolve_dir(norm, symlinks) if norm not in ("", ".") else "."
                 else:
                     canon = canonicalize_path(norm, symlinks)
@@ -224,7 +237,10 @@ def main() -> int:
 
                 if member.islnk():
                     link_norm = normalize_entry_name(member.linkname)
-                    member.linkname = canonicalize_path(link_norm, symlinks)
+                    if link_norm in USR_MERGE_DIRS:
+                        member.linkname = USR_MERGE_DIRS[link_norm]
+                    else:
+                        member.linkname = canonicalize_path(link_norm, symlinks)
 
                 if member.isreg():
                     with src.extractfile(member) as f:

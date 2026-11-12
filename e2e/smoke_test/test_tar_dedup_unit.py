@@ -381,6 +381,89 @@ class TarDedupUnitTest(unittest.TestCase):
             self.assertEqual(members_out["etc/resolv.conf"].linkname, "/run/systemd/resolve/stub-resolv.conf")
             self.assertEqual(members_out["dev/fd"].linkname, "/proc/self/fd")
 
+    def test_usr_merge_normalization_without_filesystem_rpm(self):
+        in_tar = os.path.join(self.temp_dir.name, "no_fs_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "no_fs_out.tar")
+
+        # Archive without filesystem RPM: no symlinks for bin, sbin, lib, lib64
+        # Packages contain directory entries and files under those prefixes.
+        members = [
+            ("bin", "dir", b""),
+            ("bin/tool", "file", b"tool_bytes"),
+            ("sbin", "dir", b""),
+            ("sbin/daemon", "file", b"daemon_bytes"),
+            ("lib", "dir", b""),
+            ("lib/data.bin", "file", b"data_bytes"),
+            ("lib64", "dir", b""),
+            ("lib64/libbar.so.1", "file", b"bar_bytes"),
+            ("lib64/libbar.so", "symlink", "libbar.so.1"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            # Directories bin, sbin, lib, lib64 must be remapped to usr/*
+            self.assertNotIn("bin", members_out)
+            self.assertNotIn("sbin", members_out)
+            self.assertNotIn("lib", members_out)
+            self.assertNotIn("lib64", members_out)
+
+            # Files and symlinks must be under usr/*
+            self.assertIn("usr/bin/tool", members_out)
+            self.assertIn("usr/sbin/daemon", members_out)
+            self.assertIn("usr/lib/data.bin", members_out)
+            self.assertIn("usr/lib64/libbar.so.1", members_out)
+            self.assertIn("usr/lib64/libbar.so", members_out)
+            self.assertEqual(members_out["usr/lib64/libbar.so"].linkname, "libbar.so.1")
+
+    def test_top_level_usr_merge_symlink_vs_directory(self):
+        in_tar = os.path.join(self.temp_dir.name, "symlink_and_dir_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "symlink_and_dir_out.tar")
+
+        # Archive with filesystem symlink AND an RPM containing a directory entry for lib64
+        members = [
+            ("lib64", "dir", b""),
+            ("lib64", "symlink", "usr/lib64"),
+            ("lib64/libfoo.so", "file", b"foo_content"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            # Top-level symlink lib64 -> usr/lib64 must be kept
+            self.assertIn("lib64", members_out)
+            self.assertTrue(members_out["lib64"].issym())
+            self.assertEqual(members_out["lib64"].linkname, "usr/lib64")
+
+            # Directory lib64 must be remapped into usr/lib64
+            self.assertIn("usr/lib64", members_out)
+            self.assertTrue(members_out["usr/lib64"].isdir())
+
+            # File must be under usr/lib64
+            self.assertIn("usr/lib64/libfoo.so", members_out)
+
 
 if __name__ == "__main__":
     unittest.main()
