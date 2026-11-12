@@ -24,6 +24,11 @@ def make_tar(path: str, members: list):
                 ti.linkname = data
                 ti.mode = 0o777
                 t.addfile(ti)
+            elif mtype == "hardlink":
+                ti.type = tarfile.LNKTYPE
+                ti.linkname = data
+                ti.mode = 0o644
+                t.addfile(ti)
             elif mtype == "dir":
                 ti.type = tarfile.DIRTYPE
                 ti.mode = 0o755
@@ -463,6 +468,37 @@ class TarDedupUnitTest(unittest.TestCase):
 
             # File must be under usr/lib64
             self.assertIn("usr/lib64/libfoo.so", members_out)
+
+    def test_canonicalization_hardlink(self):
+        in_tar = os.path.join(self.temp_dir.name, "hardlink_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "hardlink_out.tar")
+
+        members = [
+            ("lib64/a", "file", b"shared_content"),
+            ("lib64/b", "hardlink", "lib64/a"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members_out = {m.name: m for m in t.getmembers()}
+            self.assertIn("usr/lib64/a", members_out)
+            self.assertIn("usr/lib64/b", members_out)
+            self.assertNotIn("lib64/a", members_out)
+            self.assertNotIn("lib64/b", members_out)
+            b_member = members_out["usr/lib64/b"]
+            self.assertTrue(b_member.islnk())
+            self.assertEqual(b_member.linkname, "usr/lib64/a")
 
 
 if __name__ == "__main__":
