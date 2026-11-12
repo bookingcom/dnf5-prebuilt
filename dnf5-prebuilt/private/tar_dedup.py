@@ -159,6 +159,20 @@ def build_symlink_map(src: tarfile.TarFile) -> dict[str, str]:
     return symlinks
 
 
+def get_canonical_name(member: tarfile.TarInfo, symlinks: dict[str, str]) -> str:
+    """Computes the canonical path of a tar member taking into account symlinks and usr-merge."""
+    norm = normalize_entry_name(member.name)
+    if norm in USR_MERGE_DIRS:
+        if member.issym():
+            return norm
+        else:
+            return USR_MERGE_DIRS[norm]
+    elif member.isdir():
+        return resolve_dir(norm, symlinks) if norm not in ("", ".") else "."
+    else:
+        return canonicalize_path(norm, symlinks)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deduplicate entries in a tar archive.")
     parser.add_argument("--input", required=True, help="Path to input uncompressed tar archive")
@@ -176,23 +190,22 @@ def main() -> int:
         with tarfile.open(args.input, mode="r:") as src:
             symlinks = build_symlink_map(src)
 
+        last_file_idx: dict[str, int] = {}
+        with tarfile.open(args.input, mode="r:") as src:
+            for idx, member in enumerate(src):
+                canon = get_canonical_name(member, symlinks)
+                if not should_keep_locale(canon, allowed_langs):
+                    continue
+                if not member.isdir():
+                    last_file_idx[canon] = idx
+
         seen_entries: dict[str, str] = {}
         seen_parent_dirs: set[str] = set()
 
         with tarfile.open(args.input, mode="r:") as src, \
              tarfile.open(args.output, mode="w:") as dst:
-            for member in src:
-                norm = normalize_entry_name(member.name)
-
-                if norm in USR_MERGE_DIRS:
-                    if member.issym():
-                        canon = norm
-                    else:
-                        canon = USR_MERGE_DIRS[norm]
-                elif member.isdir():
-                    canon = resolve_dir(norm, symlinks) if norm not in ("", ".") else "."
-                else:
-                    canon = canonicalize_path(norm, symlinks)
+            for idx, member in enumerate(src):
+                canon = get_canonical_name(member, symlinks)
 
                 if not should_keep_locale(canon, allowed_langs):
                     continue
@@ -206,6 +219,20 @@ def main() -> int:
                     continue
 
                 curr_type = "dir" if member.isdir() else "file"
+
+                # Preserving the last occurrence of each file to match package installation ordering:
+                # If this is not the last occurrence of this file/symlink in the archive, skip it.
+                if curr_type == "file":
+                    if last_file_idx.get(canon) != idx:
+                        continue
+                else:
+                    if canon in seen_entries:
+                        if seen_entries[canon] != "dir":
+                            raise ValueError(
+                                f"Type conflict for entry '{canon}': cannot overwrite {seen_entries[canon]} with dir"
+                            )
+                        # Duplicate directory: keep the first occurrence, skip subsequent ones
+                        continue
 
                 # Check for directory vs file type conflict with an already registered entry
                 if canon in seen_entries:

@@ -206,7 +206,7 @@ sh_binary(
 tar_dedup(name, src, install_langs = "", out = None)
 ```
 
-Rule that deduplicates directory entries and files in an uncompressed tar archive, resolving symlinked parent directories (e.g. usr-merge symlinks like `lib64 -> usr/lib64`) to prevent dangling paths underneath directory symlinks. When `install_langs` is specified, filters out non-matching locale translation files.
+Rule that deduplicates directory entries and files in an uncompressed tar archive, preserving the last occurrence of each file to match package installation ordering, resolving symlinked parent directories (e.g. usr-merge symlinks like `lib64 -> usr/lib64`) to prevent dangling paths underneath directory symlinks. When `install_langs` is specified, filters out non-matching locale translation files.
 
 #### Attributes
 

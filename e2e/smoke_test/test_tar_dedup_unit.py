@@ -168,11 +168,11 @@ class TarDedupUnitTest(unittest.TestCase):
         with tarfile.open(out_tar, "r:") as t:
             names = [m.name for m in t.getmembers()]
 
-            # Verified deduplication: only 1 usr/bin/curl, first occurrence kept
+            # Verified deduplication: only 1 usr/bin/curl, last occurrence kept
             self.assertEqual(names.count("usr/bin/curl"), 1)
             curl_m = t.getmember("usr/bin/curl")
             with t.extractfile(curl_m) as f:
-                self.assertEqual(f.read(), b"old_curl_v1")
+                self.assertEqual(f.read(), b"new_curl_v2")
 
             # Verified locale filtering
             self.assertIn("usr/share/locale", names)
@@ -314,6 +314,50 @@ class TarDedupUnitTest(unittest.TestCase):
             names = [m.name for m in t.getmembers()]
             self.assertEqual(names.count("usr/lib64/duplicate.txt"), 1)
             self.assertNotIn("lib64/duplicate.txt", names)
+            m = t.getmember("usr/lib64/duplicate.txt")
+            with t.extractfile(m) as f:
+                self.assertEqual(f.read(), b"second_content")
+
+    def test_duplicate_symlink_last_wins(self):
+        in_tar = os.path.join(self.temp_dir.name, "dup_symlink_in.tar")
+        out_tar = os.path.join(self.temp_dir.name, "dup_symlink_out.tar")
+
+        members = [
+            ("opt/a", "dir", b""),
+            ("opt/b", "dir", b""),
+            ("opt/cur", "symlink", "a"),
+            ("opt/cur", "symlink", "b"),
+            ("opt/cur/file", "file", b"payload"),
+        ]
+        make_tar(in_tar, members)
+
+        cmd = [
+            sys.executable,
+            self.script_path,
+            "--input",
+            in_tar,
+            "--output",
+            out_tar,
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            names = [m.name for m in t.getmembers()]
+            self.assertIn("opt/a", names)
+            self.assertIn("opt/b", names)
+            self.assertIn("opt/cur", names)
+            self.assertIn("opt/b/file", names)
+            self.assertNotIn("opt/a/file", names)
+            self.assertNotIn("opt/cur/file", names)
+
+            sym_m = t.getmember("opt/cur")
+            self.assertTrue(sym_m.issym())
+            self.assertEqual(sym_m.linkname, "b")
+
+            file_m = t.getmember("opt/b/file")
+            with t.extractfile(file_m) as f:
+                self.assertEqual(f.read(), b"payload")
 
     def test_canonicalization_type_conflict(self):
         # 1. Directory followed by file at same canonical path
