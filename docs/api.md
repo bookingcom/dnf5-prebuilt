@@ -328,6 +328,8 @@ The generated JSON lockfile contains:
   - `url`: Download URL resolved from repodata.
   - `integrity`: Subresource Integrity string (`sha256-<base64>`).
   - `requested`: Present and `true` only when the package was directly requested.
+  - `pre_install_script`: Present and `true` only when the package contains a pre-installation script (`%pre`).
+  - `post_install_script`: Present and `true` only when the package contains a post-installation script (`%post`).
   - When `debug = True` (`--debug`), each package object additionally includes `dependencies`, `transitive_dependencies`, `recommends` (if non-empty), and `supplements` (if non-empty).
 
 ```json

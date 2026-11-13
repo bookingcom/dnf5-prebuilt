@@ -9,11 +9,17 @@
 #include <libdnf5/base/goal.hpp>
 #include <libdnf5/base/transaction.hpp>
 #include <libdnf5/base/transaction_package.hpp>
+#include <libdnf5/repo/package_downloader.hpp>
 #include <libdnf5/rpm/nevra.hpp>
 #include <libdnf5/rpm/package_query.hpp>
 #include <libdnf5/rpm/package_set.hpp>
 #include <libdnf5/utils/bgettext/bgettext-lib.h>
 #include <libdnf5/utils/bgettext/bgettext-mark-domain.h>
+#include <rpm/header.h>
+#include <rpm/rpmlib.h>
+#include <rpm/rpmtag.h>
+#include <rpm/rpmts.h>
+#include <rpm/rpmio.h>
 
 #include <algorithm>
 #include <climits>
@@ -644,6 +650,44 @@ void LockCommand::run() {
 
     auto install_order = compute_install_order(reachable, order_deps);
 
+    // Download any packages not already in local cache so we can inspect headers for pre/post scripts.
+    libdnf5::repo::PackageDownloader downloader(base);
+    downloader.force_keep_packages(true);
+    for (const auto & name : install_order) {
+        const auto & pkg = *pkg_by_name.at(name);
+        if (!pkg.is_available_locally()) {
+            downloader.add(pkg);
+        }
+    }
+    downloader.download();
+
+    std::map<std::string, bool> has_pre_script;
+    std::map<std::string, bool> has_post_script;
+
+    rpmts ts = rpmtsCreate();
+    rpmtsSetVSFlags(ts, _RPMVSF_NOSIGNATURES | _RPMVSF_NODIGESTS);
+
+    for (const auto & name : install_order) {
+        const auto & pkg = *pkg_by_name.at(name);
+        std::string pkg_path = pkg.get_package_path();
+        FD_t fd = Fopen(pkg_path.c_str(), "r.ufdio");
+        if (fd && !Ferror(fd)) {
+            Header header = nullptr;
+            rpmRC rc = rpmReadPackageFile(ts, fd, nullptr, &header);
+            if (header != nullptr && (rc == RPMRC_OK || rc == RPMRC_NOTTRUSTED || rc == RPMRC_NOKEY)) {
+                if (headerIsEntry(header, RPMTAG_PREIN) || headerIsEntry(header, RPMTAG_PREINPROG)) {
+                    has_pre_script[name] = true;
+                }
+                if (headerIsEntry(header, RPMTAG_POSTIN) || headerIsEntry(header, RPMTAG_POSTINPROG)) {
+                    has_post_script[name] = true;
+                }
+                headerFree(header);
+            }
+            Fclose(fd);
+        }
+    }
+    rpmtsFree(ts);
+
     json_object * root = json_object_new_object();
     json_object_object_add(root, "version", json_object_new_int(1));
     if (!arch_text.empty()) {
@@ -665,6 +709,12 @@ void LockCommand::run() {
         json_object * obj = package_object(pkg);
         add_string(obj, "url", package_url(pkg));
         add_string(obj, "integrity", integrity_of(pkg));
+        if (has_pre_script[name]) {
+            json_object_object_add(obj, "pre_install_script", json_object_new_boolean(1));
+        }
+        if (has_post_script[name]) {
+            json_object_object_add(obj, "post_install_script", json_object_new_boolean(1));
+        }
         if (directly_requested.count(name)) {
             json_object_object_add(obj, "requested", json_object_new_boolean(1));
         }
