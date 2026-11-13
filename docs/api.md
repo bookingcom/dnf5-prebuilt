@@ -541,3 +541,5 @@ Reads a JSON lockfile produced by `rpm_lock`, creates an `http_file` repository 
 - `@<name>//:rpms`: `filegroup` containing all locked RPM files ordered by `install_order`, suitable for passing directly to `rpm_layer(rpms = ["@<name>//:rpms"])` and `rpm_mark(rpms = ["@<name>//:rpms"])`.
 - `@<name>//:<pkg>`: `alias` for each individual package in the lockfile.
 - `@<name>//:defs.bzl`: Starlark module exporting `RPMS` (ordered list of label strings) and `PACKAGES` (ordered list of package names).
+- `@<name>//bazel/<package-name>:pre-script`: `rpm_script` target exposing the pre-installation scriptlet (`%pre`) for packages where `pre_install_script = True` (available even for non-requested transitive packages).
+- `@<name>//bazel/<package-name>:post-script`: `rpm_script` target exposing the post-installation scriptlet (`%post`) for packages where `post_install_script = True` (available even for non-requested transitive packages).

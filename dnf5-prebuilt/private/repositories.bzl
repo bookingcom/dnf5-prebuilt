@@ -70,6 +70,8 @@ dnf5_toolchains_repository = repository_rule(
 def _dnf5_lock_hub_repository_impl(rctx):
     rctx.file("BUILD.bazel", rctx.attr.build_content)
     rctx.file("defs.bzl", rctx.attr.defs_content)
+    for path, content in rctx.attr.package_build_files.items():
+        rctx.file(path, content)
 
 dnf5_lock_hub_repository = repository_rule(
     implementation = _dnf5_lock_hub_repository_impl,
@@ -77,5 +79,6 @@ dnf5_lock_hub_repository = repository_rule(
     attrs = {
         "build_content": attr.string(mandatory = True),
         "defs_content": attr.string(mandatory = True),
+        "package_build_files": attr.string_dict(doc = "Relative path -> BUILD.bazel content for subpackages"),
     },
 )
