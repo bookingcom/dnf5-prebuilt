@@ -176,3 +176,9 @@ reads a `.lock.json` file at module evaluation time:
    - `@<name>//:<pkg>`: an `alias` for each individual package.
    - `@<name>//:defs.bzl`: exports `RPMS` (the ordered list of `@<name>__<pkg>//file`
      label strings).
+   - `@<name>//bazel/<package-name>:pre-script`: an `rpm_script` public target
+     extracting the `%pre` installation scriptlet for packages that have
+     `pre_install_script = True` (available even for non-requested transitive packages).
+   - `@<name>//bazel/<package-name>:post-script`: an `rpm_script` public target
+     extracting the `%post` installation scriptlet for packages that have
+     `post_install_script = True` (available even for non-requested transitive packages).

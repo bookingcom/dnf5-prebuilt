@@ -142,10 +142,41 @@ filegroup(
 
     defs_content = "RPMS = %s\n" % repr(rpm_labels)
 
+    package_build_files = {}
+    for pkg in ordered_pkgs:
+        pkg_name = pkg["name"]
+        has_pre = pkg.get("pre_install_script", False)
+        has_post = pkg.get("post_install_script", False)
+        if has_pre or has_post:
+            repo_name = "%s__%s" % (tag.name, _sanitize_repo_name(pkg_name))
+            rpm_label = "@%s//file" % repo_name
+            rules = [
+                'load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_script")',
+                "",
+                'package(default_visibility = ["//visibility:public"])',
+                "",
+            ]
+            if has_pre:
+                rules.append("""\
+rpm_script(
+    name = "pre-script",
+    rpm = {rpm},
+)
+""".format(rpm = repr(rpm_label)))
+            if has_post:
+                rules.append("""\
+rpm_script(
+    name = "post-script",
+    rpm = {rpm},
+)
+""".format(rpm = repr(rpm_label)))
+            package_build_files["bazel/%s/BUILD.bazel" % pkg_name] = "\n".join(rules)
+
     dnf5_lock_hub_repository(
         name = tag.name,
         build_content = build_content,
         defs_content = defs_content,
+        package_build_files = package_build_files,
     )
 
 def _dnf5_extension_impl(mctx):
