@@ -737,6 +737,39 @@ class TarDedupUnitTest(unittest.TestCase):
             self.assertTrue(members["usr/lib64/nonempty_b"].islnk())
             self.assertEqual(members["usr/lib64/nonempty_b"].linkname, "usr/lib64/nonempty_a")
 
+    def test_newc_incomplete_group_at_package_boundary_does_not_leak(self):
+        in_cpio = os.path.join(self.temp_dir.name, "incomplete_boundary.cpio")
+        out_tar = os.path.join(self.temp_dir.name, "incomplete_boundary.tar")
+
+        # Pkg A: a/one (ino 7, nlink 2, 0 bytes) -- a/two (data member) was excluded.
+        # Pkg B: b/x (ino 7, nlink 2, 0 bytes), b/y (ino 7, nlink 2, 13 bytes).
+        # Separated by TRAILER!!! (package boundary).
+        with open(in_cpio, "wb") as fp:
+            fp.write(self._make_newc_entry("a/one", b"", ino=7, mode=0o100644, nlink=2))
+            fp.write(self._make_newc_entry("TRAILER!!!", b"", ino=0, mode=0, nlink=1))
+            fp.write(self._make_newc_entry("b/x", b"", ino=7, mode=0o100644, nlink=2))
+            fp.write(self._make_newc_entry("b/y", b"1234567890123", ino=7, mode=0o100644, nlink=2))
+            fp.write(self._make_newc_entry("TRAILER!!!", b"", ino=0, mode=0, nlink=1))
+
+        res = subprocess.run(
+            [sys.executable, self.script_path, "--input", in_cpio, "--output", out_tar],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members = {m.name: m for m in t.getmembers()}
+            self.assertTrue(members["a/one"].isreg())
+            self.assertEqual(members["a/one"].size, 0)
+
+            self.assertTrue(members["b/x"].isreg())
+            self.assertEqual(members["b/x"].size, 13)
+            self.assertEqual(t.extractfile(members["b/x"]).read(), b"1234567890123")
+
+            self.assertTrue(members["b/y"].islnk())
+            self.assertEqual(members["b/y"].linkname, "b/x")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,53 +29,51 @@ BUILD_ID_PATTERNS = [
 ]
 
 def _rpm_merge_impl(ctx):
-    ext = ".cpio" if ctx.attr.format == "newc" else ".tar"
-    out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ext))
+    out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ".cpio"))
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
 
     extra_inputs = verify_rpms_gpg(ctx)
 
     args = ctx.actions.args()
-    args.add("-cf", out)
-    args.add("--format=" + ctx.attr.format)
-    args.add("--numeric-owner")
-    args.add("--owner=0")
-    args.add("--group=0")
+    args.add("--bsdtar", bsdtar)
+    args.add("--output", out)
     for pattern in ctx.attr.exclude_patterns:
-        args.add("--exclude=" + pattern)
+        args.add("--exclude", pattern)
     for rpm in ctx.files.rpms:
-        args.add("@" + rpm.path)
+        args.add("--rpm", rpm)
 
     ctx.actions.run(
         mnemonic = "RpmMerge",
-        progress_message = "Merging RPMs into uncompressed archive %s" % out.short_path,
-        executable = bsdtar,
+        progress_message = "Merging RPMs into cpio newc archive %s" % out.short_path,
+        executable = ctx.executable._tool,
         arguments = [args],
         inputs = depset(ctx.files.rpms + extra_inputs, transitive = [tar_toolchain.default.files]),
+        tools = [bsdtar],
         outputs = [out],
         env = tar_toolchain.tarinfo.default_env,
     )
     return [DefaultInfo(files = depset([out]))]
 
 rpm_merge = rule(
-    doc = "Merges RPM packages into an uncompressed tar or cpio newc archive using bsdtar.",
+    doc = "Merges RPM packages into an uncompressed cpio newc archive using bsdtar.",
     implementation = _rpm_merge_impl,
     attrs = gpg_attrs() | {
         "exclude_patterns": attr.string_list(
             default = [],
             doc = "Glob patterns to exclude when extracting RPMs with bsdtar.",
         ),
-        "format": attr.string(
-            default = "pax",
-            values = ["pax", "newc"],
-            doc = "Output archive format ('pax' for tar, 'newc' for SVR4 cpio).",
-        ),
-        "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar (or <name>.cpio for format='newc')."),
+        "out": attr.string(doc = "Optional output file name. Defaults to <name>.cpio."),
         "rpms": attr.label_list(
             allow_files = [".rpm"],
             mandatory = True,
             doc = "RPM package files to extract and merge.",
+        ),
+        "_tool": attr.label(
+            default = Label("//dnf5-prebuilt/private:rpm_merge"),
+            executable = True,
+            cfg = "exec",
+            doc = "Internal RPM newc merge tool.",
         ),
     },
     toolchains = [TAR_TOOLCHAIN_TYPE, DNF5_TOOLCHAIN],
@@ -278,7 +276,6 @@ def rpm_layer(
         gpgcheck = gpgcheck,
         gpgkeys = gpgkeys,
         exclude_patterns = patterns,
-        format = "newc",
         out = name + "_raw.cpio",
         **intermediate_kwargs
     )

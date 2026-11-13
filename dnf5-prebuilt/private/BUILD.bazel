@@ -14,6 +14,11 @@ filegroup(
 )
 
 py_binary(
+    name = "rpm_merge",
+    srcs = ["rpm_merge.py"],
+)
+
+py_binary(
     name = "tar_dedup",
     srcs = ["tar_dedup.py"],
 )

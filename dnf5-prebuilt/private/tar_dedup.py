@@ -240,6 +240,19 @@ class CpioEntry:
     group_id: int | None = None
 
 
+def _flush_pending_groups(
+    pending_groups: dict[tuple[int, int, int], list[CpioEntry]],
+    group_data: dict[int, tuple[int, int]],
+) -> None:
+    """Finalizes any incomplete hard-link groups (e.g. when their data member was excluded)."""
+    for group in pending_groups.values():
+        gid_key = group[0].idx
+        for member in group:
+            member.group_id = gid_key
+        group_data[gid_key] = (group[-1].data_offset, group[-1].filesize)
+    pending_groups.clear()
+
+
 def read_newc_entries(fp) -> tuple[list[CpioEntry], dict[int, tuple[int, int]]]:
     """Parses a cpio newc (070701/070702) stream and groups hard-link members.
 
@@ -289,7 +302,17 @@ def read_newc_entries(fp) -> tuple[list[CpioEntry], dict[int, tuple[int, int]]]:
         data_offset = fp.tell()
 
         if name == "TRAILER!!!":
-            break
+            # Close any incomplete groups at package boundary (e.g. concatenated newc streams).
+            _flush_pending_groups(pending_groups, group_data)
+            # Skip NUL padding between concatenated cpio archives if another stream follows.
+            while True:
+                b = fp.read(1)
+                if not b:
+                    return entries, group_data
+                if b != b"\x00":
+                    fp.seek(-1, os.SEEK_CUR)
+                    break
+            continue
 
         linkname = ""
         if stat.S_ISLNK(mode):
@@ -336,13 +359,7 @@ def read_newc_entries(fp) -> tuple[list[CpioEntry], dict[int, tuple[int, int]]]:
                 group_data[gid_key] = (data_offset, filesize)
                 del pending_groups[key]
 
-    # Finalize any incomplete groups (e.g. 0-byte hard-linked file with excluded members).
-    for group in pending_groups.values():
-        gid_key = group[0].idx
-        for member in group:
-            member.group_id = gid_key
-        group_data[gid_key] = (group[-1].data_offset, group[-1].filesize)
-
+    _flush_pending_groups(pending_groups, group_data)
     return entries, group_data
 
 

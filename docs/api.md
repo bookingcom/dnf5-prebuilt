@@ -113,10 +113,10 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, exclude_patterns = [], format = "pax", out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, exclude_patterns = [], out = None)
 ```
 
-Rule that merges RPM packages into an uncompressed tar or cpio `newc` archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
+Rule that merges RPM packages into an uncompressed cpio `newc` archive using `bsdtar` directly from RPM payload archives, assigning globally unique inode numbers per package so hard-link groups never collide across packages. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the merge action depends on.
 
 #### Attributes
 
@@ -128,8 +128,7 @@ Rule that merges RPM packages into an uncompressed tar or cpio `newc` archive us
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `exclude_patterns` | `list of strings` | `[]` | Glob patterns to exclude when extracting RPMs with `bsdtar`. |
-| `format` | `string` | `"pax"` | Output archive format (`"pax"` for uncompressed tar, `"newc"` for SVR4 cpio). |
-| `out` | `string` | `None` | Optional output file name. Defaults to `<name>.tar` (or `<name>.cpio` for `format = "newc"`). |
+| `out` | `string` | `None` | Optional output file name. Defaults to `<name>.cpio`. |
 
 ---
 
