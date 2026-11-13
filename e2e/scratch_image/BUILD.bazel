@@ -199,3 +199,71 @@ sh_test(
         "requires-network",
     ],
 )
+
+EXTRACTED_SCRIPTS = [
+    "@ol10_scratch_curl_amd64//bazel/bash:post-script",
+    "@ol10_scratch_curl_amd64//bazel/ca-certificates:post-script",
+    "@ol10_scratch_curl_amd64//bazel/ca-certificates:pre-script",
+    "@ol10_scratch_curl_amd64//bazel/crypto-policies:post-script",
+    "@ol10_scratch_curl_amd64//bazel/crypto-policies:pre-script",
+    "@ol10_scratch_curl_amd64//bazel/glibc:post-script",
+    "@ol10_scratch_curl_amd64//bazel/glibc:pre-script",
+    "@ol10_scratch_curl_amd64//bazel/libgcc:post-script",
+    "@ol10_scratch_curl_amd64//bazel/p11-kit-trust:post-script",
+    "@ol10_scratch_curl_amd64//bazel/pcre2:post-script",
+    "@ol10_scratch_curl_amd64//bazel/setup:post-script",
+]
+
+filegroup(
+    name = "extracted_scripts",
+    srcs = EXTRACTED_SCRIPTS,
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "test_extracted_scripts_bin",
+    srcs = ["test_extracted_scripts.py"],
+    main = "test_extracted_scripts.py",
+)
+
+sh_test(
+    name = "extracted_scripts_test",
+    srcs = ["run_extracted_scripts_test.sh"],
+    args = [
+        "$(rootpath :test_extracted_scripts_bin)",
+        "--script",
+        "setup:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/setup:post-script)",
+        "--script",
+        "bash:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/bash:post-script)",
+        "--script",
+        "glibc:pre-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/glibc:pre-script)",
+        "--script",
+        "glibc:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/glibc:post-script)",
+        "--script",
+        "crypto-policies:pre-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/crypto-policies:pre-script)",
+        "--script",
+        "crypto-policies:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/crypto-policies:post-script)",
+        "--script",
+        "ca-certificates:pre-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/ca-certificates:pre-script)",
+        "--script",
+        "ca-certificates:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/ca-certificates:post-script)",
+        "--script",
+        "libgcc:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/libgcc:post-script)",
+        "--script",
+        "p11-kit-trust:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/p11-kit-trust:post-script)",
+        "--script",
+        "pcre2:post-script",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/pcre2:post-script)",
+    ],
+    data = [":test_extracted_scripts_bin"] + EXTRACTED_SCRIPTS,
+)
