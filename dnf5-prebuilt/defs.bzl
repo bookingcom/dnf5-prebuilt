@@ -30,6 +30,10 @@ load(
     "//dnf5-prebuilt/private:mark.bzl",
     _rpm_mark = "rpm_mark",
 )
+load(
+    "//dnf5-prebuilt/private:script.bzl",
+    _rpm_script = "rpm_script",
+)
 
 Dnf5Info = _Dnf5Info
 current_dnf5_toolchain = _current_dnf5_toolchain
@@ -43,3 +47,4 @@ tar_dedup = _tar_dedup
 rpm_extract = _rpm_extract
 rpm_lock = _rpm_lock
 rpm_mark = _rpm_mark
+rpm_script = _rpm_script
