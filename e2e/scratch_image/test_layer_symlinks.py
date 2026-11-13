@@ -72,7 +72,43 @@ def validate_layer_tar(tar_path: str) -> None:
             if not entry.startswith("usr/lib64/"):
                 raise AssertionError(f"libgcc entry '{entry}' not under usr/lib64/ in {tar_path}")
 
-        print(f"PASS: {tar_path} verified ({len(members)} entries, 0 with symlinked parents, libgcc properly located)")
+        # 4. Assert every hard link points at an earlier non-empty regular file (issue #50)
+        seen_members = {}
+        hardlink_count = 0
+        for m in members:
+            norm = normalize_entry_name(m.name)
+            if m.islnk():
+                hardlink_count += 1
+                target_norm = normalize_entry_name(m.linkname)
+                target = seen_members.get(target_norm)
+                if target is None:
+                    raise AssertionError(
+                        f"Hard link '{norm}' points to '{target_norm}' which does not appear earlier in {tar_path}"
+                    )
+                if not target.isreg():
+                    raise AssertionError(
+                        f"Hard link '{norm}' points to '{target_norm}' which is not a regular file (type={target.type!r})"
+                    )
+                if target.size == 0:
+                    raise AssertionError(
+                        f"Hard link '{norm}' points to empty (0-byte) regular file '{target_norm}' in {tar_path}"
+                    )
+            seen_members[norm] = m
+
+        if hardlink_count == 0:
+            raise AssertionError(f"Expected hard-linked entries in {tar_path}, found 0")
+
+        getconf_v6 = seen_members.get("usr/libexec/getconf/POSIX_V6_LP64_OFF64")
+        getconf_v7 = seen_members.get("usr/libexec/getconf/POSIX_V7_LP64_OFF64")
+        if getconf_v6 is None or not getconf_v6.isreg() or getconf_v6.size == 0:
+            raise AssertionError(f"Expected non-empty regular file usr/libexec/getconf/POSIX_V6_LP64_OFF64 in {tar_path}")
+        if getconf_v7 is None or not getconf_v7.islnk():
+            raise AssertionError(f"Expected hard link usr/libexec/getconf/POSIX_V7_LP64_OFF64 in {tar_path}")
+
+        print(
+            f"PASS: {tar_path} verified ({len(members)} entries, {hardlink_count} valid hard links, "
+            "0 with symlinked parents, libgcc properly located)"
+        )
 
 
 def main() -> int:

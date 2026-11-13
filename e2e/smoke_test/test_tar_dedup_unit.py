@@ -544,6 +544,199 @@ class TarDedupUnitTest(unittest.TestCase):
             self.assertTrue(b_member.islnk())
             self.assertEqual(b_member.linkname, "usr/lib64/a")
 
+    def _make_newc_entry(
+        self,
+        name: str,
+        data: bytes = b"",
+        ino: int = 1,
+        mode: int = 0o100644,
+        nlink: int = 1,
+        devmajor: int = 0,
+        devminor: int = 0,
+    ) -> bytes:
+        name_bytes = name.encode("utf-8") + b"\x00"
+        hdr = (
+            f"070701{ino:08x}{mode:08x}{0:08x}{0:08x}"
+            f"{nlink:08x}{0:08x}{len(data):08x}"
+            f"{devmajor:08x}{devminor:08x}{0:08x}{0:08x}"
+            f"{len(name_bytes):08x}{0:08x}"
+        ).encode("ascii")
+        out = hdr + name_bytes
+        out += b"\x00" * ((4 - len(out) % 4) % 4)
+        out += data
+        out += b"\x00" * ((4 - len(data) % 4) % 4)
+        return out
+
+    def _make_newc(self, path: str, entries: list[tuple]) -> None:
+        with open(path, "wb") as fp:
+            for entry in entries:
+                fp.write(self._make_newc_entry(*entry))
+            fp.write(self._make_newc_entry("TRAILER!!!", b"", ino=0, mode=0, nlink=1))
+
+    def test_newc_hardlink_group_moves_data_to_first_member(self):
+        in_cpio = os.path.join(self.temp_dir.name, "hardlinks.cpio")
+        out_tar = os.path.join(self.temp_dir.name, "hardlinks.tar")
+        extract_dir = os.path.join(self.temp_dir.name, "extracted")
+        payload = b"ELF_binary_payload_1234567890"
+
+        # In newc, a 3-member hard-link group stores data on the last member only.
+        self._make_newc(
+            in_cpio,
+            [
+                ("./usr/libexec/getconf", b"", 10, 0o040755, 2),
+                ("./usr/libexec/getconf/POSIX_V6_LP64_OFF64", b"", 11, 0o100755, 3),
+                ("./usr/libexec/getconf/POSIX_V7_LP64_OFF64", b"", 11, 0o100755, 3),
+                ("./usr/libexec/getconf/XBS5_LP64_OFF64", payload, 11, 0o100755, 3),
+            ],
+        )
+
+        res = subprocess.run(
+            [sys.executable, self.script_path, "--input", in_cpio, "--output", out_tar],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members = {m.name: m for m in t.getmembers()}
+            first = members["usr/libexec/getconf/POSIX_V6_LP64_OFF64"]
+            second = members["usr/libexec/getconf/POSIX_V7_LP64_OFF64"]
+            third = members["usr/libexec/getconf/XBS5_LP64_OFF64"]
+
+            self.assertTrue(first.isreg())
+            self.assertEqual(first.size, len(payload))
+            self.assertEqual(t.extractfile(first).read(), payload)
+
+            self.assertTrue(second.islnk())
+            self.assertEqual(second.linkname, "usr/libexec/getconf/POSIX_V6_LP64_OFF64")
+            self.assertTrue(third.islnk())
+            self.assertEqual(third.linkname, "usr/libexec/getconf/POSIX_V6_LP64_OFF64")
+
+            t.extractall(extract_dir)
+
+        for name in ("POSIX_V6_LP64_OFF64", "POSIX_V7_LP64_OFF64", "XBS5_LP64_OFF64"):
+            with open(os.path.join(extract_dir, "usr/libexec/getconf", name), "rb") as fp:
+                self.assertEqual(fp.read(), payload)
+
+    def test_newc_reused_inode_across_packages(self):
+        in_cpio = os.path.join(self.temp_dir.name, "reused_ino.cpio")
+        out_tar = os.path.join(self.temp_dir.name, "reused_ino.tar")
+
+        # Two separate packages in the merged cpio both use ino=1, dev=(0,0).
+        self._make_newc(
+            in_cpio,
+            [
+                ("usr/share/a1", b"", 1, 0o100644, 2),
+                ("usr/share/a2", b"pkg1_data", 1, 0o100644, 2),
+                ("usr/share/b1", b"", 1, 0o100644, 2),
+                ("usr/share/b2", b"pkg2_data", 1, 0o100644, 2),
+            ],
+        )
+
+        res = subprocess.run(
+            [sys.executable, self.script_path, "--input", in_cpio, "--output", out_tar],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members = {m.name: m for m in t.getmembers()}
+            self.assertTrue(members["usr/share/a1"].isreg())
+            self.assertEqual(t.extractfile(members["usr/share/a1"]).read(), b"pkg1_data")
+            self.assertTrue(members["usr/share/a2"].islnk())
+            self.assertEqual(members["usr/share/a2"].linkname, "usr/share/a1")
+
+            self.assertTrue(members["usr/share/b1"].isreg())
+            self.assertEqual(t.extractfile(members["usr/share/b1"]).read(), b"pkg2_data")
+            self.assertTrue(members["usr/share/b2"].islnk())
+            self.assertEqual(members["usr/share/b2"].linkname, "usr/share/b1")
+
+    def test_newc_hardlink_first_member_overwritten_and_locale_filtered(self):
+        in_cpio = os.path.join(self.temp_dir.name, "override.cpio")
+        out_tar = os.path.join(self.temp_dir.name, "override.tar")
+
+        self._make_newc(
+            in_cpio,
+            [
+                # Group 1: usr/bin/a is overwritten later; usr/bin/b and usr/bin/c must keep group 1 data.
+                ("usr/bin/a", b"", 1, 0o100644, 3),
+                ("usr/bin/b", b"", 1, 0o100644, 3),
+                ("usr/bin/c", b"group1_data", 1, 0o100644, 3),
+                # Group 2: first member is dropped by --install-langs=en_US.UTF-8; second survives.
+                ("usr/share/locale/de/LC_MESSAGES/app.mo", b"", 2, 0o100644, 2),
+                ("usr/share/locale/en/LC_MESSAGES/app.mo", b"en_mo_data", 2, 0o100644, 2),
+                # Overwrite usr/bin/a with a new standalone file.
+                ("usr/bin/a", b"new_a_data", 3, 0o100644, 1),
+            ],
+        )
+
+        res = subprocess.run(
+            [
+                sys.executable,
+                self.script_path,
+                "--input",
+                in_cpio,
+                "--output",
+                out_tar,
+                "--install-langs",
+                "en_US.UTF-8",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members = {m.name: m for m in t.getmembers()}
+            self.assertTrue(members["usr/bin/b"].isreg())
+            self.assertEqual(t.extractfile(members["usr/bin/b"]).read(), b"group1_data")
+            self.assertTrue(members["usr/bin/c"].islnk())
+            self.assertEqual(members["usr/bin/c"].linkname, "usr/bin/b")
+
+            self.assertTrue(members["usr/bin/a"].isreg())
+            self.assertEqual(t.extractfile(members["usr/bin/a"]).read(), b"new_a_data")
+
+            self.assertNotIn("usr/share/locale/de/LC_MESSAGES/app.mo", members)
+            self.assertTrue(members["usr/share/locale/en/LC_MESSAGES/app.mo"].isreg())
+            self.assertEqual(
+                t.extractfile(members["usr/share/locale/en/LC_MESSAGES/app.mo"]).read(),
+                b"en_mo_data",
+            )
+
+    def test_newc_usr_merge_and_zero_byte_hardlink(self):
+        in_cpio = os.path.join(self.temp_dir.name, "zero_usrmerge.cpio")
+        out_tar = os.path.join(self.temp_dir.name, "zero_usrmerge.tar")
+
+        self._make_newc(
+            in_cpio,
+            [
+                ("lib64/empty_a", b"", 5, 0o100644, 2),
+                ("lib64/empty_b", b"", 5, 0o100644, 2),
+                ("lib64/nonempty_a", b"", 6, 0o100644, 2),
+                ("lib64/nonempty_b", b"lib64_data", 6, 0o100644, 2),
+            ],
+        )
+
+        res = subprocess.run(
+            [sys.executable, self.script_path, "--input", in_cpio, "--output", out_tar],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"tar_dedup failed: {res.stderr}")
+
+        with tarfile.open(out_tar, "r:") as t:
+            members = {m.name: m for m in t.getmembers()}
+            self.assertTrue(members["usr/lib64/empty_a"].isreg())
+            self.assertEqual(members["usr/lib64/empty_a"].size, 0)
+            self.assertTrue(members["usr/lib64/empty_b"].islnk())
+            self.assertEqual(members["usr/lib64/empty_b"].linkname, "usr/lib64/empty_a")
+
+            self.assertTrue(members["usr/lib64/nonempty_a"].isreg())
+            self.assertEqual(t.extractfile(members["usr/lib64/nonempty_a"]).read(), b"lib64_data")
+            self.assertTrue(members["usr/lib64/nonempty_b"].islnk())
+            self.assertEqual(members["usr/lib64/nonempty_b"].linkname, "usr/lib64/nonempty_a")
+
 
 if __name__ == "__main__":
     unittest.main()

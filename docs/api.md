@@ -113,10 +113,10 @@ rpm_layer(
 ### `rpm_merge`
 
 ```starlark
-rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, exclude_patterns = [], out = None)
+rpm_merge(name, rpms, gpgcheck = False, gpgkeys = [], rpmdb = None, exclude_patterns = [], format = "pax", out = None)
 ```
 
-Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
+Rule that merges RPM packages into an uncompressed tar or cpio `newc` archive using `bsdtar` directly from RPM payload archives in streaming mode. When `gpgcheck = True`, creates a GPG keystore action and individual verification actions per RPM, which the bsdtar action depends on.
 
 #### Attributes
 
@@ -128,7 +128,8 @@ Rule that merges RPM packages into an uncompressed tar archive using `bsdtar` di
 | `gpgkeys` | `list of labels` | `[]` | Optional list of GPG public key files used to verify package signatures. |
 | `rpmdb` | `label` | `None` | Optional rpmdb SQLite database file containing trusted GPG keys. |
 | `exclude_patterns` | `list of strings` | `[]` | Glob patterns to exclude when extracting RPMs with `bsdtar`. |
-| `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
+| `format` | `string` | `"pax"` | Output archive format (`"pax"` for uncompressed tar, `"newc"` for SVR4 cpio). |
+| `out` | `string` | `None` | Optional output file name. Defaults to `<name>.tar` (or `<name>.cpio` for `format = "newc"`). |
 
 ---
 
@@ -206,14 +207,14 @@ sh_binary(
 tar_dedup(name, src, install_langs = "", out = None)
 ```
 
-Rule that deduplicates directory entries and files in an uncompressed tar archive, preserving the last occurrence of each file to match package installation ordering, resolving symlinked parent directories (e.g. usr-merge symlinks like `lib64 -> usr/lib64`) to prevent dangling paths underneath directory symlinks. When `install_langs` is specified, filters out non-matching locale translation files.
+Rule that deduplicates directory entries and files in an uncompressed tar or cpio `newc` archive, preserving the last occurrence of each file to match package installation ordering, resolving symlinked parent directories (e.g. usr-merge symlinks like `lib64 -> usr/lib64`) to prevent dangling paths underneath directory symlinks, and converting `newc` hard-link groups (where data is stored on the last member) into tar hard-link groups (where data is stored on the first surviving member). When `install_langs` is specified, filters out non-matching locale translation files.
 
 #### Attributes
 
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `name` | `string` | *mandatory* | Target name. |
-| `src` | `label` | *mandatory* | Input uncompressed tar archive. |
+| `src` | `label` | *mandatory* | Input uncompressed tar or cpio `newc` archive. |
 | `install_langs` | `string` | `""` | Optional language locales to keep (e.g. `'en_US.UTF-8'`), filtering out non-matching locale files. |
 | `out` | `string` | `None` | Optional output tar file name. Defaults to `<name>.tar`. |
 

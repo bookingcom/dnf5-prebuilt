@@ -29,7 +29,8 @@ BUILD_ID_PATTERNS = [
 ]
 
 def _rpm_merge_impl(ctx):
-    out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ".tar"))
+    ext = ".cpio" if ctx.attr.format == "newc" else ".tar"
+    out = ctx.actions.declare_file(ctx.attr.out or (ctx.label.name + ext))
     tar_toolchain = ctx.toolchains[TAR_TOOLCHAIN_TYPE]
     bsdtar = tar_toolchain.tarinfo.binary
 
@@ -37,7 +38,7 @@ def _rpm_merge_impl(ctx):
 
     args = ctx.actions.args()
     args.add("-cf", out)
-    args.add("--format=pax")
+    args.add("--format=" + ctx.attr.format)
     args.add("--numeric-owner")
     args.add("--owner=0")
     args.add("--group=0")
@@ -58,14 +59,19 @@ def _rpm_merge_impl(ctx):
     return [DefaultInfo(files = depset([out]))]
 
 rpm_merge = rule(
-    doc = "Merges RPM packages into an uncompressed tar archive using bsdtar.",
+    doc = "Merges RPM packages into an uncompressed tar or cpio newc archive using bsdtar.",
     implementation = _rpm_merge_impl,
     attrs = gpg_attrs() | {
         "exclude_patterns": attr.string_list(
             default = [],
             doc = "Glob patterns to exclude when extracting RPMs with bsdtar.",
         ),
-        "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar."),
+        "format": attr.string(
+            default = "pax",
+            values = ["pax", "newc"],
+            doc = "Output archive format ('pax' for tar, 'newc' for SVR4 cpio).",
+        ),
+        "out": attr.string(doc = "Optional output file name. Defaults to <name>.tar (or <name>.cpio for format='newc')."),
         "rpms": attr.label_list(
             allow_files = [".rpm"],
             mandatory = True,
@@ -105,7 +111,7 @@ tar_dedup = rule(
         "src": attr.label(
             allow_single_file = True,
             mandatory = True,
-            doc = "Input uncompressed tar archive.",
+            doc = "Input uncompressed tar or cpio newc archive.",
         ),
         "_tool": attr.label(
             default = Label("//dnf5-prebuilt/private:tar_dedup"),
@@ -272,7 +278,8 @@ def rpm_layer(
         gpgcheck = gpgcheck,
         gpgkeys = gpgkeys,
         exclude_patterns = patterns,
-        out = name + "_raw.tar",
+        format = "newc",
+        out = name + "_raw.cpio",
         **intermediate_kwargs
     )
 
