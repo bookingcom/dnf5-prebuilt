@@ -59,6 +59,8 @@ before their dependents.
 | `url` | `string` | Always | Resolved download URL (`https://...`, `http://...`, or `file://...`). Forward slashes are escaped (`\/`) by `json-c`. |
 | `integrity` | `string` | Always | Subresource Integrity (SRI) digest in `<algorithm>-<base64>` format (e.g. `"sha256-u1dQyIIF/W722XdebDs0fVyPZErKJ8+kaN/ZEwFox58="`). |
 | `requested` | `boolean` | Only when `true` | Set to `true` if the package was directly requested by the caller; omitted for transitive dependencies. |
+| `pre_install_script` | `boolean` | Only when `true` | Set to `true` if the package contains a pre-installation script (`%pre` / `RPMTAG_PREIN`); omitted when not available or false. |
+| `post_install_script` | `boolean` | Only when `true` | Set to `true` if the package contains a post-installation script (`%post` / `RPMTAG_POSTIN`); omitted when not available or false. |
 
 > **Deriving NEVRA**: When a canonical NEVRA string is needed, derive it as
 > `"{name}-{version}.{arch}"`.

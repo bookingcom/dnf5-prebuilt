@@ -448,6 +448,7 @@ LOCAL_DNF5_PLUGINS = {
         [
             "@glib//glib",
             "@json-c",
+            "@rpm",
         ],
     ),
 }

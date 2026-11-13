@@ -51,6 +51,7 @@ rpm_lock(
         "noarch",
     ],
     config = ":ol10_amd64_dnf_config",
+    install_weak_deps = False,
     packages = [
         "bash",
         "curl",
@@ -64,6 +65,7 @@ rpm_lock(
         "noarch",
     ],
     config = ":ol10_arm64_dnf_config",
+    install_weak_deps = False,
     packages = [
         "bash",
         "curl",

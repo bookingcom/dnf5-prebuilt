@@ -44,6 +44,13 @@ def validate_lock_file(path: str) -> None:
         if not integrity.startswith("sha256-"):
             raise ValueError(f"{path}: integrity is not SRI sha256-: {integrity}")
 
+        if "pre_install_script" in pkg:
+            if not isinstance(pkg["pre_install_script"], bool):
+                raise ValueError(f"{path}: 'pre_install_script' must be boolean: {pkg}")
+        if "post_install_script" in pkg:
+            if not isinstance(pkg["post_install_script"], bool):
+                raise ValueError(f"{path}: 'post_install_script' must be boolean: {pkg}")
+
         print(f"  OK: {name}-{version}.{arch} -> {url} (integrity: {integrity})")
 
     for order_name in install_order:
