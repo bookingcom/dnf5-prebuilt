@@ -49,6 +49,12 @@ py_binary(
 )
 
 py_binary(
+    name = "rpm_script",
+    srcs = ["rpm_script.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "render_repos_d",
     srcs = ["render_repos_d.py"],
 )

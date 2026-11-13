@@ -16,6 +16,7 @@ load(
     "rpm_lock",
     "rpm_mark",
     "rpm_merge",
+    "rpm_script",
     "rpmdb_inject",
     "tar_compress",
     "tar_dedup",
@@ -30,6 +31,7 @@ load(
   - [`rpm_layer`](#rpm_layer)
   - [`rpm_merge`](#rpm_merge)
   - [`rpm_extract`](#rpm_extract)
+  - [`rpm_script`](#rpm_script)
   - [`tar_dedup`](#tar_dedup)
   - [`rpmdb_inject`](#rpmdb_inject)
   - [`tar_compress`](#tar_compress)
@@ -195,6 +197,37 @@ sh_binary(
         ":curl_extracted/usr/lib64/libcurl.so.4",
         ":curl_extracted/usr/share/licenses/libcurl",
     ],
+)
+```
+
+---
+
+### `rpm_script`
+
+```starlark
+rpm_script(name, rpm, script = "", out = None, **kwargs)
+```
+
+Rule that extracts pre-installation (`%pre`) or post-installation (`%post`) scriptlets from an RPM package and makes them available as an individual file target in Bazel.
+
+#### Parameters
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name` | `string` | *mandatory* | Target name. Also determines default output file name and script type if `script` is omitted. |
+| `rpm` | `label` | *mandatory* | The RPM package file (`.rpm`) to extract the script from. |
+| `script` | `string` | `""` | Script type: `"pre"` or `"post"`. Inferred as `"pre"` if target name contains `"pre"`, otherwise `"post"`. |
+| `out` | `output` | `None` | Optional output file name. Defaults to the target name. |
+| `**kwargs` | `dict` | | Common rule attributes forwarded to generated targets (e.g. `visibility`, `tags`). |
+
+#### Example
+
+```starlark
+load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_script")
+
+rpm_script(
+    name = "post-script",
+    rpm = "@my_rpms__setup//file",
 )
 ```
 
