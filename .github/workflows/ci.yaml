@@ -117,7 +117,14 @@ jobs:
           if [ "${{ matrix.platform }}" = "linux-amd64" ]; then
             docker save -o artifacts/ol9_curl_image.tar localhost/e2e-curl-test:latest || true
           fi
+          mkdir -p artifacts/scripts
+          find e2e/scratch_image/bazel-bin/external -name "*-script" 2>/dev/null | while read -r f; do
+            pkg=$(basename $(dirname "$f"))
+            name=$(basename "$f")
+            cp -f "$f" "artifacts/scripts/${pkg}_${name}"
+          done
           ls -la artifacts/
+          ls -la artifacts/scripts/ || true
       - name: Upload e2e artifacts
         if: runner.os == 'Linux' && always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
