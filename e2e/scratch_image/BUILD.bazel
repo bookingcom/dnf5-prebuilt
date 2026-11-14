@@ -4,6 +4,9 @@ load("@rules_img//img:image.bzl", "image_manifest")
 load("@rules_img//img:layer.bzl", "layer_from_tar")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@supply_chain_tools//sbom:cyclonedx.bzl", "cyclonedx")
+load("@supply_chain_tools//sbom:sbom.bzl", "sbom")
+load("@supply_chain_tools//sbom:spdx.bzl", "spdx")
 
 exports_files([
     "ol10_scratch_curl_amd64_lock.lock.json",
@@ -266,4 +269,123 @@ sh_test(
         "$(rootpath @ol10_scratch_curl_amd64//bazel/pcre2:post-script)",
     ],
     data = [":test_extracted_scripts_bin"] + EXTRACTED_SCRIPTS,
+)
+
+py_binary(
+    name = "test_package_metadata_bin",
+    srcs = ["test_package_metadata.py"],
+    main = "test_package_metadata.py",
+)
+
+sh_test(
+    name = "package_metadata_test",
+    srcs = ["run_package_metadata_test.sh"],
+    args = [
+        "$(rootpath :test_package_metadata_bin)",
+        "--check",
+        "amd64_curl",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/curl:package_metadata)",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/curl:integrity)",
+        "pkg:rpm/oracle/curl@8.12.1-4.el10_2.8?arch=x86_64&distro=ol10",
+        "--check",
+        "amd64_openssl_libs",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/openssl-libs:package_metadata)",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/openssl-libs:integrity)",
+        "pkg:rpm/oracle/openssl-libs@3.5.8-2.0.1.el10_2?arch=x86_64&distro=ol10&epoch=1",
+        "--check",
+        "amd64_oraclelinux_release",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/oraclelinux-release:package_metadata)",
+        "$(rootpath @ol10_scratch_curl_amd64//bazel/oraclelinux-release:integrity)",
+        "pkg:rpm/oracle/oraclelinux-release@10.2-1.0.6.el10?arch=x86_64&distro=ol10&epoch=10",
+        "--check",
+        "arm64_curl",
+        "$(rootpath @ol10_scratch_curl_arm64//bazel/curl:package_metadata)",
+        "$(rootpath @ol10_scratch_curl_arm64//bazel/curl:integrity)",
+        "pkg:rpm/oracle/curl@8.12.1-4.el10_2.8?arch=aarch64&distro=ol10",
+        "--check",
+        "arm64_openssl_libs",
+        "$(rootpath @ol10_scratch_curl_arm64//bazel/openssl-libs:package_metadata)",
+        "$(rootpath @ol10_scratch_curl_arm64//bazel/openssl-libs:integrity)",
+        "pkg:rpm/oracle/openssl-libs@3.5.8-2.0.1.el10_2?arch=aarch64&distro=ol10&epoch=1",
+    ],
+    data = [
+        ":test_package_metadata_bin",
+        "@ol10_scratch_curl_amd64//bazel/curl:integrity",
+        "@ol10_scratch_curl_amd64//bazel/curl:package_metadata",
+        "@ol10_scratch_curl_amd64//bazel/openssl-libs:integrity",
+        "@ol10_scratch_curl_amd64//bazel/openssl-libs:package_metadata",
+        "@ol10_scratch_curl_amd64//bazel/oraclelinux-release:integrity",
+        "@ol10_scratch_curl_amd64//bazel/oraclelinux-release:package_metadata",
+        "@ol10_scratch_curl_arm64//bazel/curl:integrity",
+        "@ol10_scratch_curl_arm64//bazel/curl:package_metadata",
+        "@ol10_scratch_curl_arm64//bazel/openssl-libs:integrity",
+        "@ol10_scratch_curl_arm64//bazel/openssl-libs:package_metadata",
+    ],
+)
+
+# -----------------------------------------------------------------------------
+# SBOM Generation & Verification Tests (Issue #56)
+# -----------------------------------------------------------------------------
+
+sbom(
+    name = "ol10_scratch_curl_amd64_sbom",
+    require_root_metadata = False,
+    target = ":ol10_scratch_curl_amd64_image",
+)
+
+spdx(
+    name = "ol10_scratch_curl_amd64_spdx",
+    format = "json",
+    sbom = ":ol10_scratch_curl_amd64_sbom",
+)
+
+cyclonedx(
+    name = "ol10_scratch_curl_amd64_cyclonedx",
+    format = "json",
+    sbom = ":ol10_scratch_curl_amd64_sbom",
+)
+
+sbom(
+    name = "ol10_scratch_curl_arm64_sbom",
+    require_root_metadata = False,
+    target = ":ol10_scratch_curl_arm64_image",
+)
+
+spdx(
+    name = "ol10_scratch_curl_arm64_spdx",
+    format = "json",
+    sbom = ":ol10_scratch_curl_arm64_sbom",
+)
+
+cyclonedx(
+    name = "ol10_scratch_curl_arm64_cyclonedx",
+    format = "json",
+    sbom = ":ol10_scratch_curl_arm64_sbom",
+)
+
+py_binary(
+    name = "test_sbom_bin",
+    srcs = ["test_sbom.py"],
+    main = "test_sbom.py",
+)
+
+sh_test(
+    name = "sbom_generation_test",
+    srcs = ["run_sbom_test.sh"],
+    args = [
+        "$(rootpath :test_sbom_bin)",
+        "--spdx",
+        "$(rootpath :ol10_scratch_curl_amd64_spdx)",
+        "$(rootpath :ol10_scratch_curl_arm64_spdx)",
+        "--cyclonedx",
+        "$(rootpath :ol10_scratch_curl_amd64_cyclonedx)",
+        "$(rootpath :ol10_scratch_curl_arm64_cyclonedx)",
+    ],
+    data = [
+        ":ol10_scratch_curl_amd64_cyclonedx",
+        ":ol10_scratch_curl_amd64_spdx",
+        ":ol10_scratch_curl_arm64_cyclonedx",
+        ":ol10_scratch_curl_arm64_spdx",
+        ":test_sbom_bin",
+    ],
 )
