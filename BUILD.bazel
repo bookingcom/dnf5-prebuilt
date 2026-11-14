@@ -1,3 +1,5 @@
+load("@buildifier_prebuilt//:rules.bzl", "buildifier", "buildifier_test")
+
 exports_files(["LICENSE"])
 
 filegroup(
@@ -11,4 +13,28 @@ filegroup(
         "//dnf5-prebuilt/private:all_files",
     ],
     visibility = ["//visibility:public"],
+)
+
+buildifier(
+    name = "buildifier",
+    exclude_patterns = [
+        "./.git/*",
+        "./.worktrees/*",
+        "./bazel/3rdparty/modules/*",
+    ],
+    lint_mode = "fix",
+    mode = "fix",
+)
+
+buildifier_test(
+    name = "buildifier_test",
+    exclude_patterns = [
+        "./.git/*",
+        "./.worktrees/*",
+        "./bazel/3rdparty/modules/*",
+    ],
+    lint_mode = "warn",
+    mode = "diff",
+    no_sandbox = True,
+    workspace = "//:MODULE.bazel",
 )

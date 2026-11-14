@@ -102,5 +102,10 @@ common:ci --ui_event_filters=-warning
 test:ci --test_output=errors
 test:ci --test_summary=terse
 
+# Pre-commit configuration
+common:pre-commit --ui_event_filters=-info,-stdout,-stderr
+common:pre-commit --noshow_progress
+common:pre-commit --lockfile_mode=off
+
 # Import user-specific configuration (must be last)
 try-import %workspace%/.bazelrc.user
