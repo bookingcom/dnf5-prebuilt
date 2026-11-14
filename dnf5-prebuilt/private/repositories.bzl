@@ -82,3 +82,71 @@ dnf5_lock_hub_repository = repository_rule(
         "package_build_files": attr.string_dict(doc = "Relative path -> BUILD.bazel content for subpackages"),
     },
 )
+
+_PACKAGE_METADATA_BZL = str(Label("@package_metadata//rules:package_metadata.bzl"))
+_INTEGRITY_BZL = str(Label("@package_metadata//attributes:integrity.bzl"))
+
+def _dnf5_rpm_repository_impl(rctx):
+    output_path = "file/" + rctx.attr.downloaded_file_path
+    rctx.download(
+        url = rctx.attr.urls,
+        output = output_path,
+        integrity = rctx.attr.integrity,
+    )
+
+    rctx.file("REPO.bazel", 'repo(default_package_metadata = ["//:package_metadata"])\n')
+
+    build_content = """\
+load({package_metadata_bzl}, "package_metadata")
+load({integrity_bzl}, "integrity")
+
+package(default_visibility = ["//visibility:public"])
+
+package_metadata(
+    name = "package_metadata",
+    attributes = [":integrity"],
+    purl = {purl},
+)
+
+integrity(
+    name = "integrity",
+    values = [{integrity}],
+)
+
+alias(
+    name = "file",
+    actual = "//file:file",
+)
+""".format(
+        package_metadata_bzl = repr(_PACKAGE_METADATA_BZL),
+        integrity_bzl = repr(_INTEGRITY_BZL),
+        purl = repr(rctx.attr.purl),
+        integrity = repr(rctx.attr.integrity),
+    )
+
+    rctx.file("BUILD.bazel", build_content)
+
+    file_build_content = """\
+package(default_visibility = ["//visibility:public"])
+
+exports_files([{filename}])
+
+filegroup(
+    name = "file",
+    srcs = [{filename}],
+)
+""".format(
+        filename = repr(rctx.attr.downloaded_file_path),
+    )
+    rctx.file("file/BUILD.bazel", file_build_content)
+
+dnf5_rpm_repository = repository_rule(
+    implementation = _dnf5_rpm_repository_impl,
+    doc = "Downloads one RPM package and annotates it with supply-chain package_metadata.",
+    attrs = {
+        "downloaded_file_path": attr.string(mandatory = True),
+        "integrity": attr.string(mandatory = True),
+        "purl": attr.string(mandatory = True),
+        "urls": attr.string_list(mandatory = True),
+    },
+)

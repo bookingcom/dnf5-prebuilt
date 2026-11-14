@@ -18,6 +18,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = Tru
 bazel_dep(name = "pre-commit", version = "1.0.13", dev_dependency = True)
 
 bazel_dep(name = "tar.bzl", version = "0.10.9")
+bazel_dep(name = "package_metadata", version = "0.0.15")
 
 # Hermetic LLVM C/C++ toolchain from BCR
 bazel_dep(name = "llvm", version = "0.8.27", dev_dependency = True)

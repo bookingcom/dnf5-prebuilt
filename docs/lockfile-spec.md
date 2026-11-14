@@ -164,21 +164,25 @@ package entry additionally includes:
 The `dnf5.lock(name, lockfile)` tag in `@dnf5-prebuilt//dnf5-prebuilt:extensions.bzl`
 reads a `.lock.json` file at module evaluation time:
 
-1. Creates an `@bazel_tools//tools/build_defs/repo:http.bzl` `http_file`
-   repository `@<name>__<pkg>` for each entry in `packages`, using `url` and
-   `integrity`.
+1. Creates a `dnf5_rpm_repository` `@<name>__<pkg>` for each entry in `packages`,
+   using `url` and `integrity`, and annotates it with `bazel-contrib/supply-chain`
+   (`@package_metadata`) providers (`PackageMetadataInfo` with RPM PURL, and
+   `PackageAttributeInfo` with the `integrity` SRI hash).
 2. Orders the package list according to `install_order` (falling back to the
    order of `packages`).
 3. Generates a hub repository `@<name>` containing:
    - `@<name>//:rpms`: a `filegroup` listing all `@<name>__<pkg>//file` targets
      in topological `install_order`, ready to pass directly to `rpm_layer` and
      `rpm_mark`.
-   - `@<name>//:<pkg>`: an `alias` for each individual package.
+   - `@<name>//:<pkg>`: an `alias` for each individual package forwarding all
+     target providers.
    - `@<name>//:defs.bzl`: exports `RPMS` (the ordered list of `@<name>__<pkg>//file`
      label strings).
    - `@<name>//bazel/<package-name>:pre-script`: an `rpm_script` public target
      extracting the `%pre` installation scriptlet for packages that have
-     `pre_install_script = True` (available even for non-requested transitive packages).
+     `pre_install_script = True` (available even for non-requested transitive packages),
+     annotated with the package's `package_metadata`.
    - `@<name>//bazel/<package-name>:post-script`: an `rpm_script` public target
      extracting the `%post` installation scriptlet for packages that have
-     `post_install_script = True` (available even for non-requested transitive packages).
+     `post_install_script = True` (available even for non-requested transitive packages),
+     annotated with the package's `package_metadata`.
