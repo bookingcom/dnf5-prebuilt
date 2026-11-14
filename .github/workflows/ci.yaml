@@ -139,11 +139,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           lfs: true
-      - name: Check Starlark formatting
-        run: |
-          curl -sSfL --retry 5 --retry-all-errors --retry-delay 2 \
-            -o /usr/local/bin/buildifier \
-            https://github.com/bazelbuild/buildtools/releases/download/v8.5.1/buildifier-linux-amd64
-          chmod +x /usr/local/bin/buildifier
-          # Committed registry modules are immutable, so they are not checked.
-          git ls-files '*.bazel' '*.bzl' | grep -v '^bazel/3rdparty/modules/' | xargs buildifier -mode=check -lint=warn
+      - uses: ./.github/actions/setup-bazel
+        with:
+          buildbuddy-endpoint: ${{ vars.BUILDBUDDY_ENDPOINT }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+      - name: Check Starlark formatting and pre-commit config
+        run: >
+          bazel --bazelrc=.github/workflows/ci.bazelrc test
+          //:buildifier_test //hooks:test

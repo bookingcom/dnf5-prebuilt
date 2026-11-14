@@ -1,0 +1,42 @@
+load("@pre-commit//pre-commit:defs.bzl", "pre_commit")
+load("@pre-commit//pre-commit/hook:defs.bzl", "pre_commit_hook")
+load("@pre-commit//pre-commit/hooks:defs.bzl", "pre_commit_hooks")
+
+pre_commit_hook(
+    name = "format",
+    src = "@buildifier_prebuilt//:buildifier",
+    description = "Format Bazel files with buildifier",
+    exclude = "^bazel/3rdparty/modules/",
+    stages = ["@pre-commit//pre-commit/stage:pre-commit"],
+    summary = "Format Bazel files",
+    types_or = ["@pre-commit//pre-commit/tag:bazel"],
+)
+
+pre_commit_hook(
+    name = "lint",
+    src = "@buildifier_prebuilt//:buildifier",
+    args = [
+        "-lint",
+        "fix",
+    ],
+    description = "Lint Bazel files with buildifier",
+    exclude = "^bazel/3rdparty/modules/",
+    stages = ["@pre-commit//pre-commit/stage:pre-commit"],
+    summary = "Lint Bazel files",
+    types_or = ["@pre-commit//pre-commit/tag:bazel"],
+)
+
+pre_commit_hooks(
+    name = "buildifier",
+    srcs = [
+        ":format",
+        ":lint",
+    ],
+)
+
+pre_commit(
+    name = "hooks",
+    srcs = [
+        ":buildifier",
+    ],
+)

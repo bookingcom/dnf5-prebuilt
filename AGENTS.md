@@ -18,6 +18,11 @@ is; this file records the rules and the non-obvious lessons.
 - **One commit per step** (e.g. one third-party library = registry entry +
   `MODULE.bazel` + `MODULE.bazel.lock` + its smoke test). Message ends with the
   attribution line required by the session.
+- **Run buildifier sanitizer before committing.** Always execute buildifier to
+  sanitize Starlark and Bazel files before each commit (`bazel run //:buildifier`
+  to fix in place, `bazel test //:buildifier_test //hooks:test` to verify).
+  Pre-commit hooks can be installed locally with `bazel run //hooks:install` or
+  executed via `bazel run //hooks`.
 - **All tests in CI must run with BuildBuddy enabled.** Any test execution in
   CI (including unit/smoke tests in root and e2e smoke tests in `e2e/smoke_test`,
   such as the `e2e` job) must use
@@ -122,6 +127,7 @@ commit it, apply the patches, commit fixes, `git format-patch <base>`.
 ## Verifying changes
 
 ```sh
+bazel test //:buildifier_test //hooks:test                       # formatting & pre-commit tests
 bazel build //bazel/tests:hello --config=<platform>              # toolchain
 bazel test //bazel/tests/... --config=linux_amd64                 # 3rd-party smoke tests
 for p in linux_amd64 linux_arm64 osx_amd64 osx_arm64; do
