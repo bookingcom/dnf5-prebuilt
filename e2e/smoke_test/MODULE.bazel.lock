@@ -42,7 +42,7 @@
     "https://bazel-contrib.github.io/rules_img/modules/bazel_features/1.9.0/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/bazel_features/1.9.1/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/bazel_lib/3.0.0/MODULE.bazel": "not found",
-    "https://bazel-contrib.github.io/rules_img/modules/bazel_lib/3.7.2/MODULE.bazel": "not found",
+    "https://bazel-contrib.github.io/rules_img/modules/bazel_lib/3.8.0/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/bazel_skylib/1.0.3/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/bazel_skylib/1.1.1/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/bazel_skylib/1.2.0/MODULE.bazel": "not found",
@@ -75,6 +75,7 @@
     "https://bazel-contrib.github.io/rules_img/modules/libpfm/4.11.0/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/nlohmann_json/3.6.1/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/package_metadata/0.0.10/MODULE.bazel": "not found",
+    "https://bazel-contrib.github.io/rules_img/modules/package_metadata/0.0.15/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/package_metadata/0.0.3/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/package_metadata/0.0.7/MODULE.bazel": "not found",
     "https://bazel-contrib.github.io/rules_img/modules/platforms/0.0.10/MODULE.bazel": "not found",
@@ -236,8 +237,8 @@
     "https://bcr.bazel.build/modules/bazel_features/1.9.0/MODULE.bazel": "885151d58d90d8d9c811eb75e3288c11f850e1d6b481a8c9f766adee4712358b",
     "https://bcr.bazel.build/modules/bazel_features/1.9.1/MODULE.bazel": "8f679097876a9b609ad1f60249c49d68bfab783dd9be012faf9d82547b14815a",
     "https://bcr.bazel.build/modules/bazel_lib/3.0.0/MODULE.bazel": "22b70b80ac89ad3f3772526cd9feee2fa412c2b01933fea7ed13238a448d370d",
-    "https://bcr.bazel.build/modules/bazel_lib/3.7.2/MODULE.bazel": "cbc920fff00a55b2fd663d40850560a6fb17fd5ef3a9f3d6cbf0d32908dd8a40",
-    "https://bcr.bazel.build/modules/bazel_lib/3.7.2/source.json": "7a9c2b06a113c4962d329bb68befdb90d0447788a19aabaa32b476a0458e7d28",
+    "https://bcr.bazel.build/modules/bazel_lib/3.8.0/MODULE.bazel": "ac892a5b9b1d6b755c915f1e82663cb71ebffb4183d57f95c6507fafc2cac53a",
+    "https://bcr.bazel.build/modules/bazel_lib/3.8.0/source.json": "45eb621b9efa8fbc4c1c9f2ea484fc0e330558a1d8e120b063f7463363adc854",
     "https://bcr.bazel.build/modules/bazel_skylib/1.0.3/MODULE.bazel": "bcb0fd896384802d1ad283b4e4eb4d718eebd8cb820b0a2c3a347fb971afd9d8",
     "https://bcr.bazel.build/modules/bazel_skylib/1.1.1/MODULE.bazel": "1add3e7d93ff2e6998f9e118022c84d163917d912f5afafb3058e3d2f1545b5e",
     "https://bcr.bazel.build/modules/bazel_skylib/1.2.0/MODULE.bazel": "44fe84260e454ed94ad326352a698422dbe372b21a1ac9f3eab76eb531223686",
@@ -277,7 +278,8 @@
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/MODULE.bazel": "6f7b417dcc794d9add9e556673ad25cb3ba835224290f4f848f8e2db1e1fca74",
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/source.json": "f448c6e8963fdfa7eb831457df83ad63d3d6355018f6574fb017e8169deb43a9",
     "https://bcr.bazel.build/modules/package_metadata/0.0.10/MODULE.bazel": "cb66e0ce830e01bc00cd9edc984963704f2759ca893a649996e2b1c5c1ea7271",
-    "https://bcr.bazel.build/modules/package_metadata/0.0.10/source.json": "8fc6bece244828a69b3cc608f381118d67fa3cc2aa1a2851dfe8d99a8076d7d0",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.15/MODULE.bazel": "d9c06292392870150584c2f4f84fad636b7012ac7255b2801b424826bad48749",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.15/source.json": "5a9945ed1fa35e1887d6b4c3921758bfd9fa4d78b4be0b9549cab9d6db2d8ea1",
     "https://bcr.bazel.build/modules/package_metadata/0.0.3/MODULE.bazel": "77890552ecea9e284b5424c9de827a58099348763a4359e975c359a83d4faa83",
     "https://bcr.bazel.build/modules/package_metadata/0.0.7/MODULE.bazel": "7adb03933fc8401f495800cf4eafcff0edc6da0ff55c7db223ef69d19f689486",
     "https://bcr.bazel.build/modules/platforms/0.0.10/MODULE.bazel": "8cb8efaf200bdeb2150d93e162c40f388529a25852b332cec879373771e48ed5",
@@ -420,7 +422,7 @@
   "moduleExtensions": {
     "@@aspect_tools_telemetry+//:extension.bzl%telemetry": {
       "general": {
-        "bzlTransitiveDigest": "ihzLOoAnQP6Y5iSYOhEjvb6uxEbA6ZgH8Qikau2lGRU=",
+        "bzlTransitiveDigest": "V8DEOYcatJGvzYvZJpb8cEb1qkRX/jeVny5i6CHtApM=",
         "usagesDigest": "htdvxklLuLlXujQoot6VKB3QcCu0O6axCUHO9dev5bo=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_tools_telemetry+,bazel_lib bazel_lib+",
@@ -435,7 +437,7 @@
                 "aspect_rules_py": "2.0.0-alpha.10",
                 "aspect_tools_telemetry": "0.5.2"
               },
-              "last_notice": 0
+              "last_notice": 3
             }
           }
         },
@@ -447,18 +449,18 @@
     },
     "@@dnf5-prebuilt+//dnf5-prebuilt:extensions.bzl%dnf5": {
       "general": {
-        "bzlTransitiveDigest": "Exd0yIohF6pqcO2ygZ7qScYdhhls67IXODBWNVb0kVc=",
+        "bzlTransitiveDigest": "Vk6SZg5SSXjlCvJnzx7mz/hwEVgNpcJbR6qCGM5vgwI=",
         "usagesDigest": "Ltg8mANW6tYflcOeB/QgQ4luwDAnxr2IoF9X/fpNilU=",
         "recordedInputs": [
-          "ENV:DNF5_PREBUILT_DIST_DIR /home/manuel/.cache/bazel/_bazel_manuel/210a9f5ccd73b876bc1003d232b9ac33/execroot/_main/bazel-out/k8-fastbuild/bin/e2e/smoke_e2e_test.runfiles/_main/bazel/release/dist_dir",
-          "REPO_MAPPING:dnf5-prebuilt+,bazel_tools bazel_tools"
+          "ENV:DNF5_PREBUILT_DIST_DIR /home/manuel/workspace/github/bookingcom/dnf5-prebuilt/.worktrees/main/e2e/smoke_test/../../bazel-bin/bazel/release/dist_dir",
+          "REPO_MAPPING:dnf5-prebuilt+,package_metadata package_metadata+"
         ],
         "generatedRepoSpecs": {
           "dnf5_linux_amd64": {
             "repoRuleId": "@@dnf5-prebuilt+//dnf5-prebuilt/private:repositories.bzl%dnf5_dist_repository",
             "attributes": {
               "urls": [
-                "file:///home/manuel/.cache/bazel/_bazel_manuel/210a9f5ccd73b876bc1003d232b9ac33/execroot/_main/bazel-out/k8-fastbuild/bin/e2e/smoke_e2e_test.runfiles/_main/bazel/release/dist_dir/dnf5-5.4.6.0-linux_amd64.tar.gz"
+                "file:///home/manuel/workspace/github/bookingcom/dnf5-prebuilt/.worktrees/main/e2e/smoke_test/../../bazel-bin/bazel/release/dist_dir/dnf5-5.4.6.0-linux_amd64.tar.gz"
               ],
               "integrity": "",
               "version": "5.4.6.0"
@@ -468,7 +470,7 @@
             "repoRuleId": "@@dnf5-prebuilt+//dnf5-prebuilt/private:repositories.bzl%dnf5_dist_repository",
             "attributes": {
               "urls": [
-                "file:///home/manuel/.cache/bazel/_bazel_manuel/210a9f5ccd73b876bc1003d232b9ac33/execroot/_main/bazel-out/k8-fastbuild/bin/e2e/smoke_e2e_test.runfiles/_main/bazel/release/dist_dir/dnf5-5.4.6.0-linux_arm64.tar.gz"
+                "file:///home/manuel/workspace/github/bookingcom/dnf5-prebuilt/.worktrees/main/e2e/smoke_test/../../bazel-bin/bazel/release/dist_dir/dnf5-5.4.6.0-linux_arm64.tar.gz"
               ],
               "integrity": "",
               "version": "5.4.6.0"
@@ -478,7 +480,7 @@
             "repoRuleId": "@@dnf5-prebuilt+//dnf5-prebuilt/private:repositories.bzl%dnf5_dist_repository",
             "attributes": {
               "urls": [
-                "file:///home/manuel/.cache/bazel/_bazel_manuel/210a9f5ccd73b876bc1003d232b9ac33/execroot/_main/bazel-out/k8-fastbuild/bin/e2e/smoke_e2e_test.runfiles/_main/bazel/release/dist_dir/dnf5-5.4.6.0-osx_amd64.tar.gz"
+                "file:///home/manuel/workspace/github/bookingcom/dnf5-prebuilt/.worktrees/main/e2e/smoke_test/../../bazel-bin/bazel/release/dist_dir/dnf5-5.4.6.0-osx_amd64.tar.gz"
               ],
               "integrity": "",
               "version": "5.4.6.0"
@@ -488,7 +490,7 @@
             "repoRuleId": "@@dnf5-prebuilt+//dnf5-prebuilt/private:repositories.bzl%dnf5_dist_repository",
             "attributes": {
               "urls": [
-                "file:///home/manuel/.cache/bazel/_bazel_manuel/210a9f5ccd73b876bc1003d232b9ac33/execroot/_main/bazel-out/k8-fastbuild/bin/e2e/smoke_e2e_test.runfiles/_main/bazel/release/dist_dir/dnf5-5.4.6.0-osx_arm64.tar.gz"
+                "file:///home/manuel/workspace/github/bookingcom/dnf5-prebuilt/.worktrees/main/e2e/smoke_test/../../bazel-bin/bazel/release/dist_dir/dnf5-5.4.6.0-osx_arm64.tar.gz"
               ],
               "integrity": "",
               "version": "5.4.6.0"

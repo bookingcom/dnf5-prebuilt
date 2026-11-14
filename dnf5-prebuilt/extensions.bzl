@@ -16,12 +16,13 @@ extension use `dnf5-<version>-<platform>.tar.gz` archives from that directory
 instead of the published ones, without integrity checks.
 """
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+load("@package_metadata//purl:purl.bzl", "purl")
 load("//dnf5-prebuilt/private:platforms.bzl", "PLATFORMS")
 load(
     "//dnf5-prebuilt/private:repositories.bzl",
     "dnf5_dist_repository",
     "dnf5_lock_hub_repository",
+    "dnf5_rpm_repository",
     "dnf5_toolchains_repository",
 )
 load("//dnf5-prebuilt/private:versions.bzl", "DEFAULT_VERSION", "RELEASE_URL_TEMPLATE", "VERSIONS")
@@ -66,6 +67,117 @@ def _sanitize_repo_name(s):
             out.append("_")
     return "".join(out)
 
+def _extract_digits_after(s, prefix):
+    idx = s.find(prefix)
+    if idx == -1:
+        return ""
+    digits = []
+    for i in range(idx + len(prefix), len(s)):
+        c = s[i]
+        if c.isdigit():
+            digits.append(c)
+        else:
+            break
+    return "".join(digits)
+
+def _extract_vendor_and_distro(pkg, url, filename):
+    """Infers vendor namespace and distro qualifier from package metadata, URL and filename."""
+    vendor = pkg.get("vendor")
+    distro = pkg.get("distro")
+
+    url_lower = url.lower()
+    fn_lower = filename.lower()
+    ver_lower = pkg.get("version", "").lower()
+    haystack = fn_lower + " " + ver_lower
+
+    if not vendor:
+        if "oracle" in url_lower or "oracle" in fn_lower or "/ol" in url_lower:
+            vendor = "oracle"
+        elif "fedora" in url_lower or "fedora" in fn_lower:
+            vendor = "fedora"
+        elif "centos" in url_lower or "centos" in fn_lower:
+            vendor = "centos"
+        elif "rocky" in url_lower or "rocky" in fn_lower:
+            vendor = "rocky"
+        elif "almalinux" in url_lower or "almalinux" in fn_lower or "alma" in url_lower:
+            vendor = "almalinux"
+        elif "redhat" in url_lower or "rhel" in url_lower:
+            vendor = "redhat"
+        elif "amazon" in url_lower or "amazonlinux" in url_lower or "amzn" in url_lower or ".amzn" in fn_lower:
+            vendor = "amazonlinux"
+        elif "opensuse" in url_lower:
+            vendor = "opensuse"
+        elif "suse" in url_lower or "sles" in url_lower:
+            vendor = "suse"
+
+    if not distro:
+        el_num = _extract_digits_after(haystack, ".el")
+        fc_num = _extract_digits_after(haystack, ".fc")
+        amzn_num = _extract_digits_after(haystack, ".amzn")
+
+        if el_num:
+            if vendor == "oracle":
+                distro = "ol" + el_num
+            elif vendor == "centos":
+                distro = "centos-" + el_num
+            elif vendor == "rocky":
+                distro = "rocky-" + el_num
+            elif vendor == "almalinux":
+                distro = "almalinux-" + el_num
+            elif vendor == "redhat":
+                distro = "rhel-" + el_num
+            else:
+                distro = "el" + el_num
+        elif fc_num:
+            distro = "fedora-" + fc_num
+            if not vendor:
+                vendor = "fedora"
+        elif amzn_num:
+            distro = "amzn" + amzn_num
+            if not vendor:
+                vendor = "amazonlinux"
+        else:
+            for ol_tag in ["ol10", "ol9", "ol8", "ol7"]:
+                if ("/" + ol_tag + "/") in url_lower:
+                    distro = ol_tag
+                    if not vendor:
+                        vendor = "oracle"
+                    break
+
+    if not vendor:
+        if distro and distro.startswith("fedora-"):
+            vendor = "fedora"
+        elif distro and distro.startswith("amzn"):
+            vendor = "amazonlinux"
+
+    return vendor, distro
+
+def _compute_rpm_purl(pkg, vendor = None, distro = None):
+    builder = purl.builder().type("rpm").name(pkg["name"])
+
+    v = pkg.get("vendor") or vendor
+    if v:
+        builder.namespace(v.lower())
+
+    version = pkg.get("version", "")
+    if ":" in version:
+        epoch, ver_rel = version.split(":", 1)
+        builder.version(ver_rel)
+        if epoch:
+            builder.add_qualifier("epoch", epoch)
+    elif version:
+        builder.version(version)
+
+    arch = pkg.get("arch", "")
+    if arch:
+        builder.add_qualifier("arch", arch)
+
+    d = pkg.get("distro") or distro
+    if d:
+        builder.add_qualifier("distro", d.lower())
+
+    return builder.build()
+
 def _process_lock_tag(mctx, tag):
     content = mctx.read(tag.lockfile)
     data = json.decode(content)
@@ -107,11 +219,14 @@ def _process_lock_tag(mctx, tag):
         else:
             downloaded_file_path = (nevra + ".rpm").replace(":", "_")
 
+        pkg_vendor, pkg_distro = _extract_vendor_and_distro(pkg, url, downloaded_file_path)
         repo_name = "%s__%s" % (tag.name, _sanitize_repo_name(pkg_name))
-        http_file(
+        purl_str = _compute_rpm_purl(pkg, vendor = pkg_vendor, distro = pkg_distro)
+        dnf5_rpm_repository(
             name = repo_name,
             downloaded_file_path = downloaded_file_path,
             integrity = integrity,
+            purl = purl_str,
             urls = [url],
         )
 
@@ -145,32 +260,45 @@ filegroup(
     package_build_files = {}
     for pkg in ordered_pkgs:
         pkg_name = pkg["name"]
+        repo_name = "%s__%s" % (tag.name, _sanitize_repo_name(pkg_name))
+        rpm_label = "@%s//file" % repo_name
         has_pre = pkg.get("pre_install_script", False)
         has_post = pkg.get("post_install_script", False)
+
+        rules = []
         if has_pre or has_post:
-            repo_name = "%s__%s" % (tag.name, _sanitize_repo_name(pkg_name))
-            rpm_label = "@%s//file" % repo_name
-            rules = [
-                'load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_script")',
-                "",
-                'package(default_visibility = ["//visibility:public"])',
-                "",
-            ]
-            if has_pre:
-                rules.append("""\
+            rules.append('load("@dnf5-prebuilt//dnf5-prebuilt:defs.bzl", "rpm_script")')
+            rules.append("")
+
+        rules.append('package(default_package_metadata = ["@%s//:package_metadata"], default_visibility = ["//visibility:public"])' % repo_name)
+        rules.append("")
+        rules.append("""\
+alias(
+    name = "package_metadata",
+    actual = "@%s//:package_metadata",
+)
+
+alias(
+    name = "integrity",
+    actual = "@%s//:integrity",
+)
+""" % (repo_name, repo_name))
+
+        if has_pre:
+            rules.append("""\
 rpm_script(
     name = "pre-script",
     rpm = {rpm},
 )
 """.format(rpm = repr(rpm_label)))
-            if has_post:
-                rules.append("""\
+        if has_post:
+            rules.append("""\
 rpm_script(
     name = "post-script",
     rpm = {rpm},
 )
 """.format(rpm = repr(rpm_label)))
-            package_build_files["bazel/%s/BUILD.bazel" % pkg_name] = "\n".join(rules)
+        package_build_files["bazel/%s/BUILD.bazel" % pkg_name] = "\n".join(rules)
 
     dnf5_lock_hub_repository(
         name = tag.name,

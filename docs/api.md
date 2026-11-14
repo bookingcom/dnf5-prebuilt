@@ -536,10 +536,15 @@ dnf5.lock(
 use_repo(dnf5, "curl_lock")
 ```
 
-Reads a JSON lockfile produced by `rpm_lock`, creates an `http_file` repository for each locked RPM (verified by its `integrity` digest), and generates a hub repository `@<name>` exposing the RPMs in topological `install_order`:
+Reads a JSON lockfile produced by `rpm_lock`, creates a repository (`dnf5_rpm_repository`) for each locked RPM (verified by its `integrity` digest and annotated with `@package_metadata` supply-chain providers, automatically extracting `vendor` namespace and `distro` qualifiers from the package's URL and filename), and generates a hub repository `@<name>` exposing the RPMs in topological `install_order`:
 
 - `@<name>//:rpms`: `filegroup` containing all locked RPM files ordered by `install_order`, suitable for passing directly to `rpm_layer(rpms = ["@<name>//:rpms"])` and `rpm_mark(rpms = ["@<name>//:rpms"])`.
-- `@<name>//:<pkg>`: `alias` for each individual package in the lockfile.
+- `@<name>//:<pkg>`: `alias` for each individual package in the lockfile, forwarding providers including `PackageMetadataInfo`.
 - `@<name>//:defs.bzl`: Starlark module exporting `RPMS` (ordered list of label strings) and `PACKAGES` (ordered list of package names).
-- `@<name>//bazel/<package-name>:pre-script`: `rpm_script` target exposing the pre-installation scriptlet (`%pre`) for packages where `pre_install_script = True` (available even for non-requested transitive packages).
-- `@<name>//bazel/<package-name>:post-script`: `rpm_script` target exposing the post-installation scriptlet (`%post`) for packages where `post_install_script = True` (available even for non-requested transitive packages).
+- `@<name>//bazel/<package-name>:pre-script`: `rpm_script` target exposing the pre-installation scriptlet (`%pre`) for packages where `pre_install_script = True` (available even for non-requested transitive packages), annotated with the package's `package_metadata`.
+- `@<name>//bazel/<package-name>:post-script`: `rpm_script` target exposing the post-installation scriptlet (`%post`) for packages where `post_install_script = True` (available even for non-requested transitive packages), annotated with the package's `package_metadata`.
+
+Each generated package repository `@<name>__<sanitized_pkg>` provides:
+- `@<name>__<pkg>//:package_metadata`: `package_metadata` target carrying `PackageMetadataInfo` with the package PURL (e.g. `pkg:rpm/[<vendor>/]<name>@<version>?arch=<arch>[&distro=<distro>][&epoch=<epoch>]`).
+- `@<name>__<pkg>//:integrity`: `integrity` target carrying `PackageAttributeInfo` with the package's SRI digest (`build.bazel.attribute.integrity`).
+- `@<name>__<pkg>//file:file` and `@<name>__<pkg>//:file`: RPM file target annotated with `repo(default_package_metadata = ["//:package_metadata"])`.
